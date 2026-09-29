@@ -11,11 +11,10 @@ from app.models import vessel as _vessel_models  # noqa: F401
 from app.models import freight as _freight_models  # noqa: F401
 from app.models import trade as _trade_models  # noqa: F401
 from app.models import risk as _risk_models  # noqa: F401
-from app.models import domestic_coal as _domestic_coal_models  # noqa: F401
 
 from app.api.routes import (
     vessels, ports, freight, trade, risk, forecast, recommend, dashboard,
-    idle, domestic_coal,
+   
 )
 
 
@@ -48,8 +47,7 @@ app.include_router(risk.router)
 app.include_router(forecast.router)
 app.include_router(recommend.router)
 app.include_router(dashboard.router)
-app.include_router(idle.router)
-app.include_router(domestic_coal.router)
+
 
 
 @app.get("/health")

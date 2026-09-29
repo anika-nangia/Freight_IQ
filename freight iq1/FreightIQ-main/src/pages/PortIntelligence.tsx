@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { EAST_COAST_PORTS, type Port, type CargoInput } from "../services/api";
+import {
+  EAST_COAST_PORTS,
+  fetchPortMap,
+  mapFastAPIPortNameToFrontendPort,
+  type Port,
+  type CargoInput,
+} from "../services/api";
 import FreightForecastModule from "../components/modules/FreightForecastModule";
 import MarketEntryModule from "../components/modules/MarketEntryModule";
 import VesselOptimizerModule from "../components/modules/VesselOptimizerModule";
@@ -19,6 +25,7 @@ export default function PortIntelligence() {
   const { portId } = useParams<{ portId: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("forecast");
+  const [backendPort, setBackendPort] = useState<Port | undefined>(undefined);
 
   const port: Port | undefined = EAST_COAST_PORTS.find((p) => p.id === portId);
   const rawCargo = sessionStorage.getItem("freightiq_cargo");
@@ -28,7 +35,26 @@ export default function PortIntelligence() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+
+    fetchPortMap()
+      .then((data) => {
+        const destinationNodes = data.nodes.filter(
+          (node: { role: string }) => node.role === "destination"
+        );
+
+        const matchingNode = destinationNodes.find(
+          (node: { name: string }) =>
+            mapFastAPIPortNameToFrontendPort(node.name)?.id === portId
+        );
+
+        if (matchingNode) {
+          setBackendPort(mapFastAPIPortNameToFrontendPort(matchingNode.name));
+        }
+      })
+      .catch((error) => {
+        console.error("FastAPI port map error:", error);
+      });
+  }, [portId]);
 
   if (!port) {
     return (
@@ -62,6 +88,14 @@ export default function PortIntelligence() {
               <div className="w-2 h-2 rounded-full" style={{ background: port.status === "operational" ? "#10b981" : "#f59e0b" }} />
               <h1 className="text-2xl font-bold" style={{ fontFamily: "Outfit, sans-serif", color: "#e8f1f8" }}>
                 {port.name} Port Intelligence
+                {backendPort && (
+                  <span
+                    className="text-xs ml-2"
+                    style={{ color: "#10b981" }}
+                  >
+                    · Backend connected
+                  </span>
+                )}
               </h1>
               <span className="text-xs px-2 py-0.5 rounded mono" style={{ background: "rgba(14,202,212,0.08)", color: "#5a7d96" }}>
                 {port.state}

@@ -10,6 +10,23 @@ import {
   fmtShortDate,
 } from "./csvData";
 
+const FASTAPI_BASE_URL = "http://127.0.0.1:8000";
+
+export async function testFastAPI() {
+  const response = await fetch(`${FASTAPI_BASE_URL}/health`);
+  return response.json();
+}
+
+export async function fetchPortMap() {
+  const response = await fetch(`${FASTAPI_BASE_URL}/ports/map`);
+
+  if (!response.ok) {
+    throw new Error(`FastAPI error: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export interface CargoInput {
   cargoType: string;
   quantity: number;
@@ -46,6 +63,17 @@ export const EAST_COAST_PORTS: Port[] = [
   { id: "gangavaram", name: "Gangavaram", state: "Andhra Pradesh", lat: 17.63, lng: 83.22, berths: 10, maxDraft: 21.0, maxLOA: 350, cargoTypes: ["Coal", "Iron Ore", "Bauxite", "Container"], throughput: "58 MT/year", status: "operational" },
   { id: "visakhapatnam", name: "Visakhapatnam", state: "Andhra Pradesh", lat: 17.68, lng: 83.28, berths: 26, maxDraft: 18.0, maxLOA: 320, cargoTypes: ["Coal", "Iron Ore", "Container", "POL", "Fertilizer"], throughput: "72 MT/year", status: "congested" },
 ];
+
+export function mapFastAPIPortNameToFrontendPort(name: string): Port | undefined {
+  const normalizedName =
+    name === "Vizag"
+      ? "Visakhapatnam"
+      : name === "Sagar-Sandheads"
+        ? "Sagar & Sandheads"
+        : name;
+
+  return EAST_COAST_PORTS.find((p) => p.name === normalizedName);
+}
 
 /** Live status per port, computed from the real congestion index (replaces the hardcoded field above). */
 export async function getLivePortStatuses(): Promise<Record<string, Port["status"]>> {
