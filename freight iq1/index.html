@@ -124,7 +124,18 @@
         </div>
       </button>
 
-      <!-- Item 1: Congestion & Historical Freight Forecasting (Merged) -->
+      <!-- Item 1: Infrastructure Constraints Comparison -->
+      <button data-tab="infra-constraints" class="sidebar-nav-item w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors">
+        <div class="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m0 0h4m-4 0V11m0 0H9m3 0h3m-3 0v4m0 0H9m3 0h3"/></svg>
+        </div>
+        <div>
+          <div class="font-semibold text-slate-900">Infrastructure Constraints</div>
+          <div class="text-[10px] text-slate-400">LOA, Draft Limits & Cargo Handling</div>
+        </div>
+      </button>
+
+      <!-- Item 2: Congestion & Historical Freight Forecasting (Merged) -->
       <button data-tab="dual-forecast" class="sidebar-nav-item w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors">
         <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
@@ -226,34 +237,42 @@
             Explore Freight Price For Bulk Carrier Vessels
           </h1>
 
-          <!-- Decreased Size Route Heading -->
-          <div class="text-sm sm:text-base lg:text-lg font-bold text-slate-100 flex flex-wrap items-center gap-x-2 drop-shadow-md mb-6">
-            <span class="text-slate-300 font-medium">Route:</span>
-            <span>From <span id="heroOriginLabel" class="text-cyan-300 font-extrabold underline decoration-cyan-400">Indian East Coast Ports, India</span></span>
-            <span>To <span id="heroDestLabel" class="text-emerald-300 font-extrabold underline decoration-emerald-400">Australia — Newcastle - Kooragang</span></span>
+          <!-- Button to lead to Congestion-Based & Historical Freight Forecaster -->
+          <div class="my-4">
+            <button id="viewForecastBtn" onclick="state.activeTab='dual-forecast'; renderApp(); window.scrollTo({ top: 0, behavior: 'smooth' });" type="button" class="inline-flex items-center gap-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 active:from-indigo-800 text-white font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 font-outfit cursor-pointer border border-blue-400/30">
+              <svg class="w-4 h-4 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
+              <span>View Freight Forecast for the Indian East Coast</span>
+            </button>
           </div>
 
-          <!-- ROUTE QUERY INPUT BAR (DARK SEARCH BOX + FORECAST FREIGHT RATE BUTTON) -->
+          <!-- ROUTE QUERY INPUT BAR (DARK SEARCH BOX + CHECK INFRASTRUCTURE CONSTRAINTS BUTTON) -->
           <div id="searchBarSection" class="relative z-20">
             <div id="authGuardedZone" class="dark-search-box rounded-2xl p-4 sm:p-5 shadow-2xl text-white">
               
               <!-- Header Text -->
               <div class="text-xs font-semibold text-slate-300 mb-3">
-                Enter route details below to forecast freight rate
+                Enter route details below to check infrastructure constraints
               </div>
 
-              <!-- Search Form Bar + Button (Vessel Capacity Removed as Requested) -->
+              <!-- Search Form Bar + Button -->
               <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-stretch">
                 
-                <!-- Column 1: From Fixed to Indian East Coast Ports, India -->
+                <!-- Column 1: From Indian East Coast Ports, India -->
                 <div class="md:col-span-5 bg-white text-slate-900 p-3 rounded-xl flex flex-col justify-center shadow-xs">
                   <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">From</label>
-                  <select id="originSelect" class="auth-guarded-input bg-transparent text-sm font-bold text-slate-800 w-full focus:outline-none cursor-default" readonly>
-                    <option value="Indian East Coast Ports, India" selected>Indian East Coast Ports, India</option>
+                  <select id="originSelect" class="auth-guarded-input bg-transparent text-sm font-bold text-slate-800 w-full focus:outline-none cursor-pointer">
+                    <option value="Indian East Coast Ports, India" selected>Indian East Coast Ports, India (All Gateways)</option>
+                    <option value="Visakhapatnam (Vizag)">Visakhapatnam (Vizag), Andhra Pradesh</option>
+                    <option value="Gangavaram Port">Gangavaram Port, Andhra Pradesh</option>
+                    <option value="Paradip Port">Paradip Port, Odisha</option>
+                    <option value="Dhamra Port">Dhamra Port, Odisha</option>
+                    <option value="Gopalpur Port">Gopalpur Port, Odisha</option>
+                    <option value="Haldia Dock Complex">Haldia Dock Complex, West Bengal</option>
+                    <option value="Sagar & Sandheads">Sagar & Sandheads, West Bengal</option>
                   </select>
                 </div>
 
-                <!-- Column 2: To Destination Port (With ports previously in From) -->
+                <!-- Column 2: To Destination Port -->
                 <div class="md:col-span-4 bg-white text-slate-900 p-3 rounded-xl flex flex-col justify-center shadow-xs">
                   <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">To</label>
                   <select id="destSelect" class="auth-guarded-input bg-transparent text-sm font-bold text-slate-800 w-full focus:outline-none cursor-pointer">
@@ -283,10 +302,10 @@
                   </select>
                 </div>
 
-                <!-- Column 3: Forecast Freight Rate Button -->
+                <!-- Column 3: Check Infrastructure Constraints Button -->
                 <div class="md:col-span-3 flex items-center">
-                  <button id="checkPriceBtn" type="button" class="w-full h-full min-h-[56px] bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 active:from-red-800 text-white font-extrabold text-sm px-4 py-3.5 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center font-outfit tracking-wide">
-                    Forecast Freight Rate
+                  <button id="checkPriceBtn" type="button" class="w-full h-full min-h-[56px] bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 active:from-blue-900 text-white font-extrabold text-sm px-4 py-3.5 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center font-outfit tracking-wide">
+                    Check Infrastructure Constraints
                   </button>
                 </div>
               </div>
@@ -312,11 +331,6 @@
     <!-- ---------------------------------------------------- -->
     <section id="resultsDashboardSection" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
       
-      <!-- Summary Route Lane Header Bar -->
-      <div class="bg-white border border-slate-200 rounded-xl px-5 py-3.5 mb-6 flex flex-wrap items-center justify-between gap-4 shadow-xs">
-        <div id="summaryLaneText" class="text-xs sm:text-sm text-slate-700"></div>
-      </div>
-
       <!-- Main Results 2-Column Grid -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         

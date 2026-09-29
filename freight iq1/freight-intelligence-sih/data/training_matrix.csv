@@ -1,17 +1,287 @@
-date,origin_port,destination_port,vessel_class,bdi,bci,bpi,bsi,usd_inr,brent_crude_usd,wind_speed_knots,wave_height_m,rainfall_mm,port_congestion_score,queue_vessels_waiting,avg_turnaround_hrs,spot_freight_usd_ton,lower_regret_bound,upper_regret_bound
-2026-08-01,Paradip,Qingdao,Supramax,1750,2200,1680,1420,83.15,78.4,14.2,1.2,5.0,0.32,2,36.5,17.40,16.20,18.80
-2026-08-05,Paradip,Qingdao,Supramax,1780,2260,1710,1440,83.22,79.1,18.5,1.5,12.0,0.38,3,40.0,17.85,16.50,19.20
-2026-08-10,Paradip,Qingdao,Supramax,1820,2340,1750,1470,83.30,80.2,22.4,2.1,35.0,0.48,4,48.0,18.40,17.10,20.10
-2026-08-15,Paradip,Qingdao,Supramax,1890,2450,1820,1510,83.42,81.5,29.8,3.2,85.0,0.68,7,72.0,19.95,18.40,21.90
-2026-08-20,Paradip,Qingdao,Supramax,1940,2520,1860,1550,83.55,82.1,34.0,3.6,110.0,0.76,9,88.5,21.20,19.50,23.40
-2026-08-25,Paradip,Qingdao,Supramax,1870,2410,1790,1490,83.45,80.8,20.5,1.8,24.0,0.54,5,56.0,19.10,17.80,20.80
-2026-08-30,Paradip,Qingdao,Supramax,1842,2380,1765,1460,83.40,79.9,15.6,1.4,10.0,0.42,3,42.0,18.60,17.30,20.20
-2026-08-01,Visakhapatnam,Ganganagar,Multi-modal,1750,2200,1680,1420,83.15,78.4,12.0,1.0,2.0,0.30,1,28.0,739.0,690.0,810.0
-2026-08-15,Visakhapatnam,Ganganagar,Multi-modal,1890,2450,1820,1510,83.42,81.5,26.0,2.5,45.0,0.62,4,58.0,772.0,720.0,850.0
-2026-08-30,Visakhapatnam,Ganganagar,Multi-modal,1842,2380,1765,1460,83.40,79.9,14.0,1.1,5.0,0.36,2,34.0,740.0,695.0,815.0
-2026-08-01,Australia,Paradip,Capesize,1750,2200,1680,1420,83.15,78.4,14.2,1.2,5.0,0.35,3,42.0,14.20,13.10,15.60
-2026-08-15,Australia,Paradip,Capesize,1890,2450,1820,1510,83.42,81.5,31.0,3.4,90.0,0.72,8,78.0,16.50,15.20,18.20
-2026-08-30,Australia,Paradip,Capesize,1842,2380,1765,1460,83.40,79.9,15.6,1.4,10.0,0.45,4,48.0,15.10,14.00,16.50
-2026-08-01,Indonesia,Haldia,Handysize,1750,2200,1680,1420,83.15,78.4,16.0,1.4,18.0,0.40,3,46.0,16.80,15.50,18.30
-2026-08-15,Indonesia,Haldia,Handysize,1890,2450,1820,1510,83.42,81.5,28.0,2.9,70.0,0.65,6,68.0,18.70,17.20,20.40
-2026-08-30,Indonesia,Haldia,Handysize,1842,2380,1765,1460,83.40,79.9,17.0,1.5,15.0,0.44,4,50.0,17.40,16.10,19.00
+date,load_port,unload_port,vessel_type,cargo_intake,rate_usd_mt
+2025-10-03,Nikolaev,Paradip,Panamax,41000.0,47.78
+2025-10-03,Xingang,Paradip/Haldia,Supramax,38000.0,19.44
+2025-10-03,Xingang,paradip,Supramax,38000.0,18.02
+2025-10-03,Nikolaev,Paradip/Haldia,Supramax,33000.0,58.31
+2025-10-03,Richards Bay,Paradip,Supramax,55000.0,14.99
+2025-10-03,Xingang,Paradip,Panamax,44000.0,16.2
+2025-10-03,Vanino,Paradip,Supramax,55000.0,20.49
+2025-10-03,Xingang,Paradip,Handy Max,22000.0,26.69
+2025-10-03,Xingang,Paradip/Haldia,Panamax,44000.0,18.12
+2025-10-03,Nikolaev,Paradip,Supramax,33000.0,56.26
+2025-10-03,Nikolaev,Paradip/Haldia,Panamax,41000.0,50.13
+2025-10-10,Xingang,Paradip/Haldia,Supramax,38000.0,19.44
+2025-10-10,Richards Bay,Paradip,Supramax,55000.0,14.98
+2025-10-10,Xingang,Paradip,Panamax,44000.0,16.2
+2025-10-10,Xingang,Paradip/Haldia,Panamax,44000.0,18.12
+2025-10-10,Nikolaev,Paradip/Haldia,Panamax,41000.0,50.09
+2025-10-10,Vanino,Paradip,Supramax,55000.0,20.09
+2025-10-10,Nikolaev,Paradip/Haldia,Supramax,33000.0,58.27
+2025-10-10,Xingang,paradip,Supramax,38000.0,18.02
+2025-10-10,Nikolaev,Paradip,Panamax,41000.0,47.74
+2025-10-10,Xingang,Paradip,Handy Max,22000.0,26.69
+2025-10-10,Nikolaev,Paradip,Supramax,33000.0,56.22
+2025-10-17,Xingang,Paradip/Haldia,Panamax,44000.0,17.33
+2025-10-17,Xingang,Paradip,Panamax,44000.0,15.44
+2025-10-17,Nikolaev,Paradip/Haldia,Panamax,41000.0,49.61
+2025-10-17,Nikolaev,Paradip/Haldia,Supramax,33000.0,57.82
+2025-10-17,Xingang,paradip,Supramax,38000.0,17.12
+2025-10-17,Nikolaev,Paradip,Supramax,33000.0,55.79
+2025-10-17,Richards Bay,Paradip,Supramax,55000.0,14.03
+2025-10-17,Vanino,Paradip,Supramax,55000.0,19.8
+2025-10-17,Nikolaev,Paradip,Panamax,41000.0,47.28
+2025-10-17,Xingang,Paradip/Haldia,Supramax,38000.0,18.5
+2025-10-17,Xingang,Paradip,Handy Max,22000.0,25.42
+2025-10-24,Nikolaev,Paradip,Supramax,33000.0,56.01
+2025-10-24,Xingang,Paradip/Haldia,Panamax,44000.0,17.5
+2025-10-24,Nikolaev,Paradip/Haldia,Panamax,41000.0,49.83
+2025-10-24,Nikolaev,Paradip/Haldia,Supramax,33000.0,58.05
+2025-10-24,Xingang,Paradip,Panamax,44000.0,15.61
+2025-10-24,Vanino,Paradip,Supramax,55000.0,19.8
+2025-10-24,Xingang,Paradip,Handy Max,22000.0,25.7
+2025-10-24,Xingang,Paradip/Haldia,Supramax,38000.0,18.72
+2025-10-24,Nikolaev,Paradip,Panamax,41000.0,47.5
+2025-10-24,Richards Bay,Paradip,Supramax,55000.0,14.34
+2025-10-24,Xingang,paradip,Supramax,38000.0,17.33
+2025-10-31,Nikolaev,Paradip/Haldia,Supramax,33000.0,58.06
+2025-10-31,Nikolaev,Paradip/Haldia,Panamax,41000.0,49.84
+2025-10-31,Xingang,paradip,Supramax,38000.0,17.34
+2025-10-31,Nikolaev,Paradip,Panamax,41000.0,47.5
+2025-10-31,Vanino,Paradip,Supramax,55000.0,19.8
+2025-10-31,Xingang,Paradip,Handy Max,22000.0,25.71
+2025-10-31,Xingang,Paradip,Panamax,44000.0,15.61
+2025-10-31,Nikolaev,Paradip,Supramax,33000.0,56.02
+2025-10-31,Richards Bay,Paradip,Supramax,55000.0,14.31
+2025-10-31,Xingang,Paradip/Haldia,Panamax,44000.0,17.5
+2025-10-31,Xingang,Paradip/Haldia,Supramax,38000.0,18.73
+2025-11-07,Nikolaev,Paradip,Supramax,33000.0,56.0
+2025-11-07,Vanino,Paradip,Supramax,55000.0,19.8
+2025-11-07,Nikolaev,Paradip,Panamax,41000.0,47.48
+2025-11-07,Xingang,Paradip/Haldia,Supramax,38000.0,18.79
+2025-11-07,Xingang,paradip,Supramax,38000.0,17.4
+2025-11-07,Xingang,Paradip,Panamax,44000.0,15.66
+2025-11-07,Nikolaev,Paradip/Haldia,Panamax,41000.0,49.81
+2025-11-07,Xingang,Paradip/Haldia,Panamax,44000.0,17.55
+2025-11-07,Xingang,Paradip,Handy Max,22000.0,25.79
+2025-11-07,Nikolaev,Paradip/Haldia,Supramax,33000.0,58.04
+2025-11-07,Richards Bay,Paradip,Supramax,55000.0,14.35
+2025-11-14,Richards Bay,Paradip,Supramax,55000.0,14.32
+2025-11-14,Xingang,Paradip,Panamax,44000.0,15.65
+2025-11-14,Xingang,Paradip,Handy Max,22000.0,25.78
+2025-11-14,Nikolaev,Paradip/Haldia,Supramax,33000.0,58.16
+2025-11-14,Xingang,paradip,Supramax,38000.0,17.39
+2025-11-14,Vanino,Paradip,Supramax,55000.0,19.8
+2025-11-14,Nikolaev,Paradip,Supramax,33000.0,56.12
+2025-11-14,Xingang,Paradip/Haldia,Supramax,38000.0,18.78
+2025-11-14,Xingang,Paradip/Haldia,Panamax,44000.0,17.54
+2025-11-14,Nikolaev,Paradip/Haldia,Panamax,41000.0,49.92
+2025-11-14,Nikolaev,Paradip,Panamax,41000.0,47.59
+2025-11-21,Nikolaev,Paradip/Haldia,Supramax,33000.0,58.14
+2025-11-21,Xingang,Paradip,Panamax,44000.0,15.53
+2025-11-21,Xingang,paradip,Supramax,38000.0,17.24
+2025-11-21,Nikolaev,Paradip,Supramax,33000.0,56.1
+2025-11-21,Nikolaev,Paradip,Panamax,41000.0,47.57
+2025-11-21,Vanino,Paradip,Supramax,55000.0,19.8
+2025-11-21,Richards Bay,Paradip,Supramax,55000.0,14.16
+2025-11-21,Xingang,Paradip/Haldia,Panamax,44000.0,17.42
+2025-11-21,Nikolaev,Paradip/Haldia,Panamax,41000.0,49.91
+2025-11-21,Xingang,Paradip,Handy Max,22000.0,25.57
+2025-11-21,Xingang,Paradip/Haldia,Supramax,38000.0,18.62
+2025-11-28,Nikolaev,Paradip,Panamax,41000.0,47.18
+2025-11-28,Xingang,Paradip,Handy Max,22000.0,25.3
+2025-11-28,Nikolaev,Paradip,Supramax,33000.0,55.68
+2025-11-28,Xingang,Paradip/Haldia,Panamax,44000.0,17.25
+2025-11-28,Xingang,Paradip/Haldia,Supramax,38000.0,18.41
+2025-11-28,Richards Bay,Paradip,Supramax,55000.0,13.97
+2025-11-28,Vanino,Paradip,Supramax,55000.0,19.8
+2025-11-28,Xingang,paradip,Supramax,38000.0,17.04
+2025-11-28,Nikolaev,Paradip/Haldia,Panamax,41000.0,49.5
+2025-11-28,Xingang,Paradip,Panamax,44000.0,15.37
+2025-11-28,Nikolaev,Paradip/Haldia,Supramax,33000.0,57.71
+2025-12-05,Xingang,paradip,Supramax,38000.0,17.07
+2025-12-05,Nikolaev,Paradip,Panamax,41000.0,47.3
+2025-12-05,Vanino,Paradip,Supramax,55000.0,19.8
+2025-12-05,Xingang,Paradip/Haldia,Supramax,38000.0,18.45
+2025-12-05,Nikolaev,Paradip/Haldia,Panamax,41000.0,49.63
+2025-12-05,Richards Bay,Paradip,Supramax,55000.0,14.02
+2025-12-05,Nikolaev,Paradip/Haldia,Supramax,33000.0,57.84
+2025-12-05,Xingang,Paradip/Haldia,Panamax,44000.0,17.28
+2025-12-05,Xingang,Paradip,Handy Max,22000.0,25.35
+2025-12-05,Nikolaev,Paradip,Supramax,33000.0,55.81
+2025-12-05,Xingang,Paradip,Panamax,44000.0,15.4
+2025-12-12,Xingang,Paradip/Haldia,Panamax,44000.0,16.58
+2025-12-12,Xingang,paradip,Supramax,38000.0,16.37
+2025-12-12,Nikolaev,Paradip,Panamax,41000.0,46.15
+2025-12-12,Vanino,Paradip,Supramax,55000.0,19.03
+2025-12-12,Xingang,Paradip,Panamax,44000.0,14.75
+2025-12-12,Nikolaev,Paradip/Haldia,Panamax,41000.0,48.43
+2025-12-12,Nikolaev,Paradip/Haldia,Supramax,33000.0,56.69
+2025-12-12,Xingang,Paradip/Haldia,Supramax,38000.0,17.71
+2025-12-12,Nikolaev,Paradip,Supramax,33000.0,54.7
+2025-12-12,Richards Bay,Paradip,Supramax,55000.0,13.63
+2025-12-12,Xingang,Paradip,Handy Max,22000.0,24.26
+2025-12-19,Nikolaev,Paradip/Haldia,Panamax,41000.0,46.86
+2025-12-19,Xingang,Paradip/Haldia,Panamax,44000.0,16.15
+2025-12-19,Xingang,Paradip,Panamax,44000.0,14.35
+2025-12-19,Nikolaev,Paradip,Supramax,33000.0,53.14
+2025-12-19,Xingang,Paradip,Handy Max,22000.0,23.59
+2025-12-19,Nikolaev,Paradip,Panamax,41000.0,44.63
+2025-12-19,Xingang,Paradip/Haldia,Supramax,38000.0,17.24
+2025-12-19,Nikolaev,Paradip/Haldia,Supramax,33000.0,55.09
+2025-12-19,Richards Bay,Paradip,Supramax,55000.0,13.2
+2025-12-19,Vanino,Paradip,Supramax,55000.0,18.74
+2025-12-19,Xingang,paradip,Supramax,38000.0,15.92
+2025-12-26,Xingang,Paradip/Haldia,Supramax,38000.0,16.72
+2025-12-26,Xingang,Paradip,Panamax,44000.0,13.85
+2025-12-26,Xingang,paradip,Supramax,38000.0,15.42
+2025-12-26,Xingang,Paradip,Handy Max,22000.0,22.77
+2025-12-26,Xingang,Paradip/Haldia,Panamax,44000.0,15.62
+2025-12-26,Vanino,Paradip,Supramax,55000.0,18.17
+2025-12-26,Nikolaev,Paradip,Panamax,41000.0,43.07
+2025-12-26,Nikolaev,Paradip/Haldia,Panamax,41000.0,45.24
+2025-12-26,Richards Bay,Paradip,Supramax,55000.0,13.06
+2025-12-26,Nikolaev,Paradip,Supramax,33000.0,51.6
+2025-12-26,Nikolaev,Paradip/Haldia,Supramax,33000.0,53.5
+2026-01-02,Nikolaev,Paradip/Haldia,Panamax,41000.0,44.08
+2026-01-02,Xingang,paradip,Supramax,38000.0,14.76
+2026-01-02,Xingang,Paradip,Handy Max,22000.0,21.74
+2026-01-02,Richards Bay,Paradip,Supramax,55000.0,12.42
+2026-01-02,Nikolaev,Paradip,Supramax,33000.0,50.53
+2026-01-02,Nikolaev,Paradip/Haldia,Supramax,33000.0,52.39
+2026-01-02,Xingang,Paradip/Haldia,Panamax,44000.0,14.95
+2026-01-02,Nikolaev,Paradip,Panamax,41000.0,41.96
+2026-01-02,Vanino,Paradip,Supramax,55000.0,17.6
+2026-01-02,Xingang,Paradip,Panamax,44000.0,13.23
+2026-01-02,Xingang,Paradip/Haldia,Supramax,38000.0,16.02
+2026-01-09,Nikolaev,Paradip,Panamax,41000.0,41.9
+2026-01-09,Xingang,Paradip,Panamax,44000.0,13.16
+2026-01-09,Xingang,Paradip,Handy Max,22000.0,21.62
+2026-01-09,Vanino,Paradip,Supramax,55000.0,17.6
+2026-01-09,Richards Bay,Paradip,Supramax,55000.0,12.32
+2026-01-09,Nikolaev,Paradip/Haldia,Panamax,41000.0,44.02
+2026-01-09,Xingang,Paradip/Haldia,Panamax,44000.0,14.88
+2026-01-09,Xingang,Paradip/Haldia,Supramax,38000.0,15.92
+2026-01-09,Nikolaev,Paradip,Supramax,33000.0,50.47
+2026-01-09,Xingang,paradip,Supramax,38000.0,14.67
+2026-01-09,Nikolaev,Paradip/Haldia,Supramax,33000.0,52.32
+2026-01-16,Nikolaev,Paradip/Haldia,Supramax,33000.0,52.49
+2026-01-16,Xingang,Paradip/Haldia,Supramax,38000.0,16.22
+2026-01-16,Nikolaev,Paradip/Haldia,Panamax,41000.0,44.17
+2026-01-16,Xingang,Paradip,Handy Max,22000.0,22.0
+2026-01-16,Vanino,Paradip,Supramax,55000.0,17.66
+2026-01-16,Xingang,paradip,Supramax,38000.0,14.96
+2026-01-16,Nikolaev,Paradip,Supramax,33000.0,50.63
+2026-01-16,Nikolaev,Paradip,Panamax,41000.0,42.05
+2026-01-16,Richards Bay,Paradip,Supramax,55000.0,12.61
+2026-01-16,Xingang,Paradip,Panamax,44000.0,13.38
+2026-01-16,Xingang,Paradip/Haldia,Panamax,44000.0,15.11
+2026-01-23,Nikolaev,Paradip/Haldia,Supramax,33000.0,53.18
+2026-01-23,Xingang,paradip,Supramax,38000.0,15.66
+2026-01-23,Xingang,Paradip/Haldia,Supramax,38000.0,16.96
+2026-01-23,Xingang,Paradip,Panamax,44000.0,13.74
+2026-01-23,Nikolaev,Paradip/Haldia,Panamax,41000.0,44.88
+2026-01-23,Xingang,Paradip,Handy Max,22000.0,23.58
+2026-01-23,Vanino,Paradip,Supramax,55000.0,18.02
+2026-01-23,Nikolaev,Paradip,Supramax,33000.0,51.3
+2026-01-23,Richards Bay,Paradip,Supramax,55000.0,13.24
+2026-01-23,Nikolaev,Paradip,Panamax,41000.0,42.73
+2026-01-23,Xingang,Paradip/Haldia,Panamax,44000.0,15.49
+2026-01-30,Xingang,Paradip,Handy Max,22000.0,24.66
+2026-01-30,Nikolaev,Paradip/Haldia,Panamax,41000.0,45.41
+2026-01-30,Vanino,Paradip,Supramax,55000.0,18.02
+2026-01-30,Xingang,Paradip/Haldia,Panamax,44000.0,16.16
+2026-01-30,Richards Bay,Paradip,Supramax,55000.0,13.96
+2026-01-30,Nikolaev,Paradip/Haldia,Supramax,33000.0,54.25
+2026-01-30,Xingang,Paradip,Panamax,44000.0,14.37
+2026-01-30,Nikolaev,Paradip,Supramax,33000.0,52.33
+2026-01-30,Xingang,paradip,Supramax,38000.0,16.4
+2026-01-30,Xingang,Paradip/Haldia,Supramax,38000.0,17.74
+2026-01-30,Nikolaev,Paradip,Panamax,41000.0,43.24
+2026-02-06,Xingang,Paradip,Panamax,44000.0,14.39
+2026-02-06,Nikolaev,Paradip/Haldia,Panamax,41000.0,45.61
+2026-02-06,Xingang,Paradip/Haldia,Supramax,38000.0,17.76
+2026-02-06,Xingang,paradip,Supramax,38000.0,16.43
+2026-02-06,Xingang,Paradip,Handy Max,22000.0,24.69
+2026-02-06,Nikolaev,Paradip,Supramax,33000.0,52.54
+2026-02-06,Richards Bay,Paradip,Supramax,55000.0,14.01
+2026-02-06,Vanino,Paradip,Supramax,55000.0,17.95
+2026-02-06,Xingang,Paradip/Haldia,Panamax,44000.0,16.18
+2026-02-06,Nikolaev,Paradip,Panamax,41000.0,43.43
+2026-02-06,Nikolaev,Paradip/Haldia,Supramax,33000.0,54.46
+2026-02-13,Xingang,paradip,Supramax,38000.0,16.53
+2026-02-13,Xingang,Paradip/Haldia,Panamax,44000.0,16.27
+2026-02-13,Nikolaev,Paradip,Panamax,41000.0,44.6
+2026-02-13,Nikolaev,Paradip,Supramax,33000.0,53.77
+2026-02-13,Nikolaev,Paradip/Haldia,Panamax,41000.0,46.8
+2026-02-13,Xingang,Paradip,Handy Max,22000.0,24.83
+2026-02-13,Xingang,Paradip/Haldia,Supramax,38000.0,17.87
+2026-02-13,Richards Bay,Paradip,Supramax,55000.0,14.15
+2026-02-13,Xingang,Paradip,Panamax,44000.0,14.47
+2026-02-13,Vanino,Paradip,Supramax,55000.0,17.95
+2026-02-13,Nikolaev,Paradip/Haldia,Supramax,33000.0,55.73
+2026-02-20,Xingang,Paradip,Handy Max,22000.0,24.83
+2026-02-20,Nikolaev,Paradip/Haldia,Panamax,41000.0,47.56
+2026-02-20,Xingang,Paradip/Haldia,Supramax,38000.0,17.87
+2026-02-20,Xingang,paradip,Supramax,38000.0,16.53
+2026-02-20,Richards Bay,Paradip,Supramax,55000.0,14.21
+2026-02-20,Nikolaev,Paradip/Haldia,Supramax,33000.0,56.53
+2026-02-20,Nikolaev,Paradip,Supramax,33000.0,54.56
+2026-02-20,Vanino,Paradip,Supramax,55000.0,17.95
+2026-02-20,Xingang,Paradip,Panamax,44000.0,14.47
+2026-02-20,Xingang,Paradip/Haldia,Panamax,44000.0,16.27
+2026-02-20,Nikolaev,Paradip,Panamax,41000.0,45.34
+2026-02-27,Xingang,Paradip/Haldia,Supramax,38000.0,18.07
+2026-02-27,Richards Bay,Paradip,Supramax,55000.0,14.47
+2026-02-27,Xingang,Paradip/Haldia,Panamax,44000.0,16.42
+2026-02-27,Vanino,Paradip,Supramax,55000.0,18.02
+2026-02-27,Nikolaev,Paradip,Supramax,33000.0,54.54
+2026-02-27,Nikolaev,Paradip/Haldia,Panamax,41000.0,47.55
+2026-02-27,Nikolaev,Paradip,Panamax,41000.0,45.32
+2026-02-27,Xingang,Paradip,Handy Max,22000.0,25.09
+2026-02-27,Xingang,Paradip,Panamax,44000.0,14.62
+2026-02-27,Nikolaev,Paradip/Haldia,Supramax,33000.0,56.52
+2026-02-27,Xingang,paradip,Supramax,38000.0,16.72
+2026-03-06,Nikolaev,Paradip,Panamax,41000.0,51.76
+2026-03-06,Nikolaev,Paradip,Supramax,33000.0,60.35
+2026-03-06,Vanino,Paradip,Supramax,55000.0,20.13
+2026-03-06,Richards Bay,Paradip,Supramax,55000.0,18.01
+2026-03-06,Xingang,Paradip/Haldia,Supramax,38000.0,21.84
+2026-03-06,Xingang,Paradip,Handy Max,22000.0,29.72
+2026-03-06,Xingang,paradip,Supramax,38000.0,20.32
+2026-03-06,Nikolaev,Paradip/Haldia,Panamax,41000.0,54.25
+2026-03-06,Nikolaev,Paradip/Haldia,Supramax,33000.0,62.53
+2026-03-06,Xingang,Paradip,Panamax,44000.0,17.94
+2026-03-06,Xingang,Paradip/Haldia,Panamax,44000.0,19.94
+2026-03-13,Richards Bay,Paradip,Supramax,55000.0,23.06
+2026-03-13,Nikolaev,Paradip,Panamax,41000.0,55.12
+2026-03-13,Xingang,Paradip/Haldia,Panamax,44000.0,23.95
+2026-03-13,Nikolaev,Paradip,Supramax,33000.0,63.92
+2026-03-13,Xingang,Paradip/Haldia,Supramax,38000.0,26.96
+2026-03-13,Vanino,Paradip,Supramax,55000.0,21.21
+2026-03-13,Xingang,Paradip,Handy Max,22000.0,36.31
+2026-03-13,Xingang,paradip,Supramax,38000.0,25.22
+2026-03-13,Nikolaev,Paradip/Haldia,Supramax,33000.0,66.2
+2026-03-13,Xingang,Paradip,Panamax,44000.0,21.78
+2026-03-13,Nikolaev,Paradip/Haldia,Panamax,41000.0,57.7
+2026-03-20,Richards Bay,Paradip,Supramax,55000.0,24.34
+2026-03-20,Nikolaev,Paradip/Haldia,Panamax,41000.0,61.25
+2026-03-20,Xingang,Paradip/Haldia,Panamax,44000.0,25.14
+2026-03-20,Xingang,Paradip/Haldia,Supramax,38000.0,28.19
+2026-03-20,Vanino,Paradip,Supramax,55000.0,38.6
+2026-03-20,Xingang,paradip,Supramax,38000.0,26.38
+2026-03-20,Nikolaev,Paradip,Supramax,33000.0,67.33
+2026-03-20,Nikolaev,Paradip/Haldia,Supramax,33000.0,69.72
+2026-03-20,Xingang,Paradip,Panamax,44000.0,22.89
+2026-03-20,Nikolaev,Paradip,Panamax,41000.0,58.54
+2026-03-20,Xingang,Paradip,Handy Max,22000.0,37.16
+2026-03-27,Vanino,Paradip,Supramax,55000.0,38.6
+2026-03-27,Nikolaev,Paradip/Haldia,Supramax,33000.0,69.72
+2026-03-27,Xingang,Paradip/Haldia,Panamax,44000.0,25.14
+2026-03-27,Nikolaev,Paradip/Haldia,Panamax,41000.0,61.25
+2026-03-27,Xingang,Paradip,Panamax,44000.0,22.89
+2026-03-27,Richards Bay,Paradip,Supramax,55000.0,24.34
+2026-03-27,Nikolaev,Paradip,Supramax,33000.0,67.33
+2026-03-27,Xingang,paradip,Supramax,38000.0,26.38
+2026-03-27,Nikolaev,Paradip,Panamax,41000.0,58.54
+2026-03-27,Xingang,Paradip,Handy Max,22000.0,37.16
+2026-03-27,Xingang,Paradip/Haldia,Supramax,38000.0,28.19

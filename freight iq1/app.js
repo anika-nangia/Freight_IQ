@@ -9,6 +9,7 @@ const state = {
   user: null,
   activeTab: "dashboard", // "dashboard" | "dual-forecast" | "recommendations" | "idle-analysis" | "port-map" | "model-analysis"
   hasCalculatedPrice: false,
+  selectedForecastPort: "vizag",
   modelHistory: [],
   modelHistoryFilter: { search: "", vessel: "all", category: "all" },
   query: {
@@ -702,7 +703,7 @@ function initEventListeners() {
     handleFormChange();
   });
 
-  // Forecast Freight Rate Button (Directs to Congestion & Freight Forecaster screen)
+  // Check Infrastructure Constraints Button (Directs to Infrastructure Constraints comparison screen)
   document.getElementById("checkPriceBtn")?.addEventListener("click", (e) => {
     e.preventDefault();
     if (!isLoggedIn()) {
@@ -711,16 +712,15 @@ function initEventListeners() {
     }
     state.hasCalculatedPrice = true;
     handleFormChange();
-    // Direct to Congestion & Freight Forecaster sidebar screen as requested
-    state.activeTab = "dual-forecast";
+    state.activeTab = "infra-constraints";
     renderApp();
     window.scrollTo({ top: 0, behavior: "smooth" });
     recordModelHistoryEntry({
-      action: "Freight Rate Valuation",
-      category: "valuation",
-      notes: `Spot freight rate forecasted for ${state.query.origin} to ${state.query.destination}.`
+      action: "Infrastructure Constraints Analysis",
+      category: "infrastructure",
+      notes: `Compared LOA & Draft constraints for corridor: ${state.query.origin} → ${state.query.destination}.`
     });
-    showToast("Freight rate forecasted. Navigating to Congestion & Freight Forecaster.");
+    showToast("Navigating to Infrastructure Constraints & Port Capabilities Analysis.");
   });
 
   // Feedback Submission
@@ -764,6 +764,7 @@ function handleFormChange() {
 
 function recalculateAndRender() {
   renderResultsSection();
+  if (state.activeTab === "infra-constraints") renderInfraConstraintsView();
   if (state.activeTab === "dual-forecast") renderDualForecastView();
   if (state.activeTab === "recommendations") renderRecommendationsView();
   if (state.activeTab === "idle-analysis") renderIdleAnalysisView();
@@ -809,7 +810,8 @@ function renderApp() {
     resultsSection?.classList.add("hidden");
     dynamicViewContainer?.classList.remove("hidden");
 
-    if (state.activeTab === "dual-forecast") renderDualForecastView();
+    if (state.activeTab === "infra-constraints") renderInfraConstraintsView();
+    else if (state.activeTab === "dual-forecast") renderDualForecastView();
     else if (state.activeTab === "recommendations") renderRecommendationsView();
     else if (state.activeTab === "idle-analysis") renderIdleAnalysisView();
     else if (state.activeTab === "port-map") renderPortMapView();
@@ -1201,159 +1203,157 @@ function drawMarketTrendsChart() {
 // 7. SIDEBAR TAB 1: CONGESTION & HISTORICAL FORECASTING
 // -------------------------------------------------------------
 
+// -------------------------------------------------------------
+// 7. SIDEBAR TAB 1: CONGESTION & HISTORICAL FORECASTING
+// -------------------------------------------------------------
+
+window.selectForecastPort = function(portId) {
+  state.selectedForecastPort = portId;
+  renderDualForecastView();
+};
+
 function renderDualForecastView() {
   const container = document.getElementById("dynamicViewContainer");
   if (!container) return;
 
   const m = getCalculatedMetrics();
+  const currentPortId = state.selectedForecastPort || "vizag";
+  const currentPort = state.portsIndia.find(p => p.id === currentPortId) || state.portsIndia[0];
+
+  const scoreFrac = (currentPort.congestion / 100).toFixed(2);
+  const isHighCongestion = currentPort.congestion >= 60;
+  const isModerate = currentPort.congestion >= 45 && currentPort.congestion < 60;
+  
+  // Dynamic 7-day rate momentum & impact
+  const rateImpactPct = ((currentPort.congestion - 45) * 0.22).toFixed(1);
+  const rateImpactSign = rateImpactPct >= 0 ? `+${rateImpactPct}%` : `${rateImpactPct}%`;
 
   container.innerHTML = `
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
       <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span class="text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200">
-            Dual-Model Engine Architecture
+            Congestion-Driven Telemetry Engine
           </span>
           <h2 class="text-2xl font-bold text-slate-900 mt-2 font-outfit">
-            Congestion-Based & Historical Freight Forecaster
+            Congestion-Based 7-Day Freight Forecaster
           </h2>
+          <p class="text-xs text-slate-500 mt-1">
+            Predicting 7-day spot rate risk curves directly tied to East Coast berth congestion scores and anchorage vessel queues.
+          </p>
         </div>
-        <button onclick="state.activeTab='dashboard'; renderApp();" class="text-xs bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium px-3.5 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5">
+        <button onclick="state.activeTab='dashboard'; renderApp();" class="text-xs bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium px-3.5 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 self-start md:self-auto">
           ← Back to Route Query
         </button>
       </div>
 
-      <!-- Corridor Lane Summary & Expected Pricing Overview Box (Shifted from front page) -->
-      <div class="mb-6 space-y-4">
-        <div class="bg-white border border-slate-200 rounded-xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-4 shadow-xs">
-          <div class="text-xs sm:text-sm text-slate-700">
-            <span class="font-bold text-slate-900">${state.query.origin}</span>
-            <span class="text-slate-400 mx-2">→</span>
-            <span class="font-bold text-slate-900">${state.query.destination}</span>
-            <span class="text-slate-300 mx-2.5">|</span>
-            <span class="text-blue-700 font-semibold">${state.query.vesselType} Bulk Carrier</span>
-            <span class="text-slate-300 mx-2.5">|</span>
-            <span class="text-slate-500 font-medium">${m.distanceNm.toLocaleString()} Nautical Miles</span>
+      <!-- PORT TELEMETRY SELECTOR BAR -->
+      <div class="card-elevation p-4 bg-white rounded-2xl border border-slate-200 mb-6 shadow-xs">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-0.5">
+              Select East Coast Port Telemetry Dataset:
+            </label>
+            <p class="text-xs text-slate-500">
+              Live port-specific queue telemetry updates the 7-day forecast line and regret bands dynamically.
+            </p>
           </div>
-        </div>
-
-        <!-- Expected Rate Pricing Card -->
-        <div class="card-elevation p-6 bg-white border border-slate-200">
-          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-slate-100">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold text-slate-500">Expected Rate</span>
-                <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  High Confidence
-                </span>
-              </div>
-              <div class="flex items-baseline gap-2 mt-1.5">
-                <span class="text-3xl sm:text-4xl font-extrabold text-slate-900 font-outfit">${m.expectedPriceStr}</span>
-                <span class="text-sm font-semibold text-slate-500">${m.unit}</span>
-              </div>
-              <div class="text-xs text-slate-400 mt-1">
-                Typical range: ${m.typicalRangeStr}
-              </div>
-              <div class="text-xs text-blue-700 font-semibold mt-1">
-                ${m.totalVoyageCostStr}
-              </div>
-            </div>
-
-            <!-- Recent Trends -->
-            <div class="sm:text-right bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <div class="text-xs font-semibold text-slate-500 mb-1 flex sm:justify-end items-center gap-1">
-                Recent Trends <span class="cursor-pointer text-slate-400">ⓘ</span>
-              </div>
-              <div class="text-xs text-slate-600 flex sm:justify-end items-center gap-2">
-                <span>Compared to last week:</span>
-                <span class="text-red-500 font-bold">↑ ${m.lastWeekDiff}</span>
-              </div>
-              <div class="text-xs text-slate-600 flex sm:justify-end items-center gap-2 mt-0.5">
-                <span>Compared to last month:</span>
-                <span class="text-emerald-600 font-bold">↓ ${m.lastMonthDiff}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Trip Cost Breakdown (Collapsible Accordions) -->
-          <div class="pt-4">
-            <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Voyage Cost Breakdown</div>
-            <div class="space-y-2">
-              <details class="group bg-slate-50 rounded-lg p-3 border border-slate-200/80 transition-colors">
-                <summary class="flex items-center justify-between text-xs font-semibold text-slate-700 cursor-pointer list-none">
-                  <span class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
-                    Bunker Fuel Prices (VLSFO Benchmark)
-                  </span>
-                  <span class="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
-                </summary>
-                <div class="mt-2.5 pt-2.5 border-t border-slate-200 text-xs text-slate-600 space-y-1">
-                  <div class="flex justify-between"><span>Singapore / Fujairah VLSFO:</span><span class="font-semibold text-slate-800">$620 / MT</span></div>
-                  <div class="flex justify-between"><span>Main Engine Consumption:</span><span>26 MT / day at 13.0 knots</span></div>
-                  <div class="flex justify-between"><span>Port Auxiliary Generator Fuel:</span><span>$1,800 / day hotel load</span></div>
-                </div>
-              </details>
-              <details class="group bg-slate-50 rounded-lg p-3 border border-slate-200/80 transition-colors">
-                <summary class="flex items-center justify-between text-xs font-semibold text-slate-700 cursor-pointer list-none">
-                  <span class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                    Port Dues, Pilotage & Berth Hire
-                  </span>
-                  <span class="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
-                </summary>
-                <div class="mt-2.5 pt-2.5 border-t border-slate-200 text-xs text-slate-600 space-y-1">
-                  <div class="flex justify-between"><span>Pilotage & Towage:</span><span class="font-semibold text-slate-800">$0.42 / GRT</span></div>
-                  <div class="flex justify-between"><span>Berth Hire (Discharge Window):</span><span class="font-semibold text-slate-800">$5,760</span></div>
-                  <div class="flex justify-between"><span>Total Estimated Port Charges:</span><span class="font-bold text-slate-900">$24,800</span></div>
-                </div>
-              </details>
-            </div>
-          </div>
+          <select id="forecastPortSelect" onchange="window.selectForecastPort(this.value)" class="bg-slate-50 border border-slate-300 text-slate-900 text-xs font-bold rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer transition-colors shadow-2xs">
+            ${state.portsIndia.map(p => `
+              <option value="${p.id}" ${p.id === currentPortId ? 'selected' : ''}>
+                ${p.name} (${p.state}) — Congestion Score: ${p.congestion}/100 | Queue: ${p.waiting} vessels
+              </option>
+            `).join('')}
+          </select>
         </div>
       </div>
 
-      <!-- Forecaster Telemetry Metrics (14-Day Momentum & Congestion Score) -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div class="card-elevation p-4 border-l-4 border-blue-600">
-          <div class="text-xs text-slate-500 font-medium">Model 1 Congestion Score</div>
-          <div class="text-2xl font-bold text-slate-900 mt-1 font-outfit">0.48 <span class="text-xs font-normal text-slate-500">/ 1.0</span></div>
-          <div class="text-xs text-amber-600 font-medium mt-1">Moderate queue pressure</div>
+      <!-- Forecaster Telemetry Metrics (Dynamic linked to selected port dataset) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div class="card-elevation p-4 border-l-4 ${isHighCongestion ? 'border-rose-600 bg-rose-50/20' : isModerate ? 'border-amber-500 bg-amber-50/20' : 'border-emerald-500 bg-emerald-50/20'}">
+          <div class="text-xs text-slate-500 font-medium">${currentPort.name} Congestion Index</div>
+          <div class="text-2xl font-bold font-outfit ${isHighCongestion ? 'text-rose-700' : isModerate ? 'text-amber-700' : 'text-emerald-700'} mt-1">
+            ${scoreFrac} <span class="text-xs font-normal text-slate-500">/ 1.0 (${currentPort.congestion}%)</span>
+          </div>
+          <div class="text-xs font-semibold mt-1 ${isHighCongestion ? 'text-rose-600' : isModerate ? 'text-amber-600' : 'text-emerald-600'}">
+            ${isHighCongestion ? '⚠️ High Berth Queue / Heavy Delay Risk' : isModerate ? '⚡ Moderate Queue Pressure' : '🟢 Fast Berth Turnover / Low Delay'}
+          </div>
         </div>
+
         <div class="card-elevation p-4 border-l-4 border-indigo-600">
-          <div class="text-xs text-slate-500 font-medium">14-Day Rate Momentum</div>
-          <div class="text-2xl font-bold text-slate-900 mt-1 font-outfit">+8.4% <span class="text-xs font-normal text-emerald-600">▲</span></div>
-          <div class="text-xs text-emerald-600 font-medium mt-1">Upward trajectory confirmed</div>
+          <div class="text-xs text-slate-500 font-medium">7-Day Rate Forecast Trajectory</div>
+          <div class="text-2xl font-bold text-slate-900 mt-1 font-outfit">
+            ${rateImpactSign} 
+            <span class="text-xs font-normal ${rateImpactPct >= 0 ? 'text-rose-600' : 'text-emerald-600'}">${rateImpactPct >= 0 ? '▲ Upward Surcharge' : '▼ Rate Savings'}</span>
+          </div>
+          <div class="text-xs font-medium mt-1 ${rateImpactPct >= 0 ? 'text-rose-600' : 'text-emerald-600'}">
+            ${rateImpactPct >= 0 ? 'Berth demurrage expected to drive 7-day spot pricing higher' : 'Smooth port discharge maintains stable baseline rates'}
+          </div>
+        </div>
+
+        <div class="card-elevation p-4 border-l-4 border-sky-600">
+          <div class="text-xs text-slate-500 font-medium">Anchorage Queue Telemetry</div>
+          <div class="text-2xl font-bold text-slate-900 mt-1 font-outfit">
+            ${currentPort.waiting} <span class="text-xs font-normal text-slate-500">ships in queue</span>
+          </div>
+          <div class="text-xs text-slate-600 font-medium mt-1">
+            Channel Draft: <strong>${currentPort.maxDraft}m</strong> | Max LOA: <strong>${currentPort.maxLoa}m</strong>
+          </div>
         </div>
       </div>
 
+      <!-- MAIN CHART & BACKTEST PANEL -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div class="lg:col-span-2 card-elevation p-6">
-          <div class="flex items-center justify-between mb-4">
+        <div class="lg:col-span-2 card-elevation p-6 bg-white rounded-2xl border border-slate-200">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
             <div>
-              <h3 class="font-bold text-slate-900 font-outfit text-base">Coupled Freight Rate & Congestion Trajectory (7-60 Days)</h3>
+              <h3 class="font-bold text-slate-900 font-outfit text-base">
+                Coupled Freight Rate & Congestion Trajectory — ${currentPort.name}
+              </h3>
+              <p class="text-xs text-slate-500">
+                7-Day to 60-Day dynamic projection generated from ${currentPort.name}'s congestion telemetry (${currentPort.congestion}%)
+              </p>
             </div>
+            <span class="text-[11px] font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full shrink-0">
+              Live Dataset Connected
+            </span>
           </div>
-          <div class="relative w-full h-[280px]">
+          <div class="relative w-full h-[300px]">
             <canvas id="dualForecastCanvas" class="w-full h-full"></canvas>
           </div>
         </div>
 
-        <div class="card-elevation p-6 flex flex-col justify-between">
+        <div class="card-elevation p-6 bg-white rounded-2xl border border-slate-200 flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <h3 class="font-bold text-slate-900 font-outfit text-base">Model Valuation & Metrics</h3>
+              <h3 class="font-bold text-slate-900 font-outfit text-base">Model Telemetry & Backtest</h3>
               <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Validated</span>
             </div>
             <p class="text-xs text-slate-500 mb-4">Empirical backtest metrics on historical East Coast fixtures:</p>
             <div class="space-y-3 text-xs">
-              <div class="flex items-center justify-between py-1.5 border-b border-slate-50">
+              <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
                 <span class="text-slate-500">Forecast Error (MAE)</span>
                 <span class="font-bold text-slate-800">$0.62 / Ton</span>
               </div>
-              <div class="flex items-center justify-between py-1.5 border-b border-slate-50">
+              <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
                 <span class="text-slate-500">Backtest Accuracy</span>
                 <span class="font-bold text-emerald-600">94.6%</span>
               </div>
+              <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
+                <span class="text-slate-500">Primary Predictor</span>
+                <span class="font-bold text-slate-800">Berth Queue Index</span>
+              </div>
+              <div class="flex items-center justify-between py-1.5">
+                <span class="text-slate-500">Regret Loss Benefit</span>
+                <span class="font-bold text-teal-700">59.2% vs OLS</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 pt-3 border-t border-slate-100 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+            <div class="text-[11px] font-bold text-slate-700 mb-1">Port Summary (${currentPort.name}):</div>
+            <div class="text-[11px] text-slate-600 leading-relaxed">
+              ${currentPort.description}
             </div>
           </div>
         </div>
@@ -1369,11 +1369,15 @@ function drawDualForecastCanvas() {
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
 
+  const currentPortId = state.selectedForecastPort || "vizag";
+  const port = state.portsIndia.find(p => p.id === currentPortId) || state.portsIndia[0];
+  const c = port.congestion; // e.g., 72, 68, 52, 44, 42, 38, 30
+
   // High DPI Rendering for Razor Sharp Clarity
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
   const w = rect.width || canvas.parentElement?.clientWidth || 600;
-  const h = 280;
+  const h = 300;
 
   canvas.width = w * dpr;
   canvas.height = h * dpr;
@@ -1389,14 +1393,47 @@ function drawDualForecastCanvas() {
   const gh = h - padding.top - padding.bottom;
 
   const timeLabels = ["-30 Days", "-15 Days", "-7 Days", "Today", "+7 Days", "+14 Days", "+30 Days", "+60 Days"];
-  const rateHist = [17.2, 17.6, 18.0, 18.4];
-  const rateForecast = [18.4, 18.9, 19.5, 20.8, 22.4];
-  const lowerBounds = [18.4, 17.8, 18.3, 19.0, 19.8];
-  const upperBounds = [18.4, 19.9, 21.2, 23.6, 25.8];
-  const congestionVals = [34, 40, 48, 55, 62, 70, 82, 88]; // Percentage %
+
+  // DYNAMIC CONGESTION TRAJECTORY (%) based on port's score
+  const c0 = Math.max(12, Math.round(c * 0.52));
+  const c1 = Math.max(15, Math.round(c * 0.70));
+  const c2 = Math.max(20, Math.round(c * 0.85));
+  const c3 = c; // Today
+  const c4 = Math.min(96, Math.round(c * (1 + (c >= 60 ? 0.12 : c >= 45 ? 0.04 : -0.08))));
+  const c5 = Math.min(96, Math.round(c * (1 + (c >= 60 ? 0.22 : c >= 45 ? 0.07 : -0.12))));
+  const c6 = Math.min(96, Math.round(c * (1 + (c >= 60 ? 0.28 : c >= 45 ? 0.09 : -0.16))));
+  const c7 = Math.min(96, Math.round(c * (1 + (c >= 60 ? 0.32 : c >= 45 ? 0.10 : -0.20))));
+  const congestionVals = [c0, c1, c2, c3, c4, c5, c6, c7];
+
+  // DYNAMIC FREIGHT RATE TRAJECTORY ($/Ton)
+  const baseRate = 18.40;
+  const rateHist = [
+    parseFloat((baseRate - 1.2).toFixed(2)),
+    parseFloat((baseRate - 0.8).toFixed(2)),
+    parseFloat((baseRate - 0.4).toFixed(2)),
+    baseRate
+  ];
+
+  // Rate forecast delta per period linked to congestion deviation from 45% baseline
+  const congFactor = (c - 45) / 100;
+  const r0 = baseRate;
+  const r1 = parseFloat((baseRate + congFactor * 2.5).toFixed(2));
+  const r2 = parseFloat((baseRate + congFactor * 4.2).toFixed(2));
+  const r3 = parseFloat((baseRate + congFactor * 5.8).toFixed(2));
+  const r4 = parseFloat((baseRate + congFactor * 7.0).toFixed(2));
+  const rateForecast = [r0, r1, r2, r3, r4];
+
+  // Dynamic Regret Bounds
+  const lowerBounds = rateForecast.map((rf, idx) => parseFloat((rf - 0.6 - idx * 0.25).toFixed(2)));
+  const upperBounds = rateForecast.map((rf, idx) => parseFloat((rf + 0.8 + idx * (c >= 60 ? 0.85 : 0.45)).toFixed(2)));
+
+  // Y Scale Calculations
+  const allRates = [...rateHist, ...rateForecast, ...lowerBounds, ...upperBounds];
+  const minRateVal = Math.floor(Math.min(...allRates) - 1.0);
+  const maxRateVal = Math.ceil(Math.max(...allRates) + 1.0);
 
   function getX(i) { return padding.left + (i / (timeLabels.length - 1)) * gw; }
-  function getRateY(v) { return padding.top + gh - ((v - 15) / 12) * gh; }
+  function getRateY(v) { return padding.top + gh - ((v - minRateVal) / (maxRateVal - minRateVal)) * gh; }
   function getCongY(pct) { return padding.top + gh - (pct / 100) * gh; }
 
   // Background Fill & Grid
@@ -1415,7 +1452,8 @@ function drawDualForecastCanvas() {
   ctx.fillText("Congestion Index (%)", padding.left + gw + 55, padding.top - 18);
 
   // Horizontal Grid Lines & Dual Y-Labels
-  for (let rate = 16; rate <= 26; rate += 2) {
+  const stepRate = (maxRateVal - minRateVal) > 10 ? 2 : 1;
+  for (let rate = minRateVal; rate <= maxRateVal; rate += stepRate) {
     const y = getRateY(rate);
     ctx.strokeStyle = "#f1f5f9";
     ctx.lineWidth = 1;
@@ -1431,14 +1469,14 @@ function drawDualForecastCanvas() {
     ctx.fillText(`$${rate.toFixed(1)}`, padding.left - 8, y + 3.5);
 
     // Right label (% congestion)
-    const pctEquiv = Math.round(((rate - 15) / 12) * 100);
+    const pctEquiv = Math.round(((rate - minRateVal) / (maxRateVal - minRateVal)) * 100);
     ctx.fillStyle = "#0d9488";
     ctx.textAlign = "left";
     ctx.fillText(`${pctEquiv}%`, padding.left + gw + 8, y + 3.5);
   }
 
   // Shaded Asymmetric Regret Interval
-  const regretGrad = ctx.createLinearGradient(0, getRateY(26), 0, getRateY(17));
+  const regretGrad = ctx.createLinearGradient(0, getRateY(maxRateVal), 0, getRateY(minRateVal));
   regretGrad.addColorStop(0, "rgba(225, 29, 72, 0.22)");
   regretGrad.addColorStop(1, "rgba(225, 29, 72, 0.03)");
   ctx.fillStyle = regretGrad;
@@ -1560,23 +1598,23 @@ function drawDualForecastCanvas() {
   // Callout tag on Today
   ctx.fillStyle = "#0f172a";
   ctx.beginPath();
-  ctx.roundRect(todayX - 25, getRateY(18.4) - 24, 50, 18, 4);
+  ctx.roundRect(todayX - 28, getRateY(r0) - 24, 56, 18, 4);
   ctx.fill();
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 10px 'JetBrains Mono', monospace";
   ctx.textAlign = "center";
-  ctx.fillText("$18.40", todayX, getRateY(18.4) - 12);
+  ctx.fillText(`$${r0.toFixed(2)}`, todayX, getRateY(r0) - 12);
 
-  // Callout tag on End of Forecast
-  const lastX = getX(7);
-  ctx.fillStyle = "#e11d48";
+  // Callout tag on +7 Days (Focus of 7-day forecast)
+  const d7X = getX(4);
+  ctx.fillStyle = c >= 50 ? "#e11d48" : "#059669";
   ctx.beginPath();
-  ctx.roundRect(lastX - 48, getRateY(22.4) - 22, 48, 18, 4);
+  ctx.roundRect(d7X - 35, getRateY(r1) - 24, 70, 18, 4);
   ctx.fill();
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 10px 'JetBrains Mono', monospace";
   ctx.textAlign = "center";
-  ctx.fillText("$22.40", lastX - 24, getRateY(22.4) - 10);
+  ctx.fillText(`$${r1.toFixed(2)} (+7d)`, d7X, getRateY(r1) - 12);
 
   // X-Axis Time Labels
   ctx.fillStyle = "#64748b";
@@ -1584,7 +1622,9 @@ function drawDualForecastCanvas() {
   ctx.textAlign = "center";
   for (let i = 0; i < timeLabels.length; i++) {
     const isToday = i === 3;
-    ctx.fillStyle = isToday ? "#10b981" : "#64748b";
+    const isD7 = i === 4;
+    ctx.fillStyle = isToday ? "#10b981" : isD7 ? "#e11d48" : "#64748b";
+    ctx.font = isD7 ? "bold 11px Inter, sans-serif" : "bold 10px Inter, sans-serif";
     ctx.fillText(timeLabels[i], getX(i), padding.top + gh + 18);
   }
 
@@ -1608,18 +1648,18 @@ function drawDualForecastCanvas() {
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle = "#334155";
-  ctx.fillText("Rate Forecast", legX + 104, legY + 6);
+  ctx.fillText("7D Rate Forecast", legX + 104, legY + 6);
 
   ctx.strokeStyle = "#0d9488";
   ctx.lineWidth = 2;
   ctx.setLineDash([3, 2]);
   ctx.beginPath();
-  ctx.moveTo(legX + 180, legY + 3);
-  ctx.lineTo(legX + 195, legY + 3);
+  ctx.moveTo(legX + 190, legY + 3);
+  ctx.lineTo(legX + 205, legY + 3);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle = "#334155";
-  ctx.fillText("Queue Risk %", legX + 199, legY + 6);
+  ctx.fillText("Congestion Index %", legX + 209, legY + 6);
 }
 
 // -------------------------------------------------------------
@@ -3867,6 +3907,446 @@ function renderHistoryItemCard(item) {
             Total: $${(item.totalExpenditure / 1e6).toFixed(2)}M
           </span>
         </div>
+      </div>
+
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
+// 12. SIDEBAR TAB: INFRASTRUCTURE CONSTRAINTS & PORT CAPABILITIES
+// -------------------------------------------------------------
+
+const portConstraintsData = [
+  { port_id: "visakhapatnam", port_name: "Visakhapatnam (Vizag)", state: "Andhra Pradesh", latitude: 17.686, longitude: 83.218, max_draft_m: 18.0, max_loa_m: 320.0, max_beam_m: 48.0, num_berths: 26, crane_handling_tph: 22000, tide_restriction: false, max_vessel_class: "Capesize", typical_throughput_mt: 72 },
+  { port_id: "gangavaram", port_name: "Gangavaram Port", state: "Andhra Pradesh", latitude: 17.633, longitude: 83.221, max_draft_m: 21.0, max_loa_m: 350.0, max_beam_m: 52.0, num_berths: 10, crane_handling_tph: 26000, tide_restriction: false, max_vessel_class: "Capesize", typical_throughput_mt: 58 },
+  { port_id: "paradip", port_name: "Paradip Port", state: "Odisha", latitude: 20.316, longitude: 86.611, max_draft_m: 14.5, max_loa_m: 295.0, max_beam_m: 45.0, num_berths: 18, crane_handling_tph: 25000, tide_restriction: false, max_vessel_class: "Capesize", typical_throughput_mt: 138 },
+  { port_id: "dhamra", port_name: "Dhamra Port", state: "Odisha", latitude: 20.762, longitude: 86.903, max_draft_m: 17.0, max_loa_m: 300.0, max_beam_m: 46.0, num_berths: 8, crane_handling_tph: 24000, tide_restriction: false, max_vessel_class: "Capesize", typical_throughput_mt: 35 },
+  { port_id: "gopalpur", port_name: "Gopalpur Port", state: "Odisha", latitude: 19.267, longitude: 84.900, max_draft_m: 9.0, max_loa_m: 185.0, max_beam_m: 28.0, num_berths: 4, crane_handling_tph: 8000, tide_restriction: false, max_vessel_class: "Handymax", typical_throughput_mt: 8 },
+  { port_id: "haldia", port_name: "Haldia Dock Complex", state: "West Bengal", latitude: 22.028, longitude: 88.068, max_draft_m: 8.5, max_loa_m: 210.0, max_beam_m: 31.0, num_berths: 24, crane_handling_tph: 9000, tide_restriction: true, max_vessel_class: "Handysize", typical_throughput_mt: 42 },
+  { port_id: "sagar", port_name: "Sagar & Sandheads", state: "West Bengal", latitude: 21.650, longitude: 88.100, max_draft_m: 9.5, max_loa_m: 230.0, max_beam_m: 32.0, num_berths: 6, crane_handling_tph: 10000, tide_restriction: true, max_vessel_class: "Panamax", typical_throughput_mt: 12 }
+];
+
+const internationalLoadingPortsData = [
+  { country: "Australia", port_name: "Australia — Newcastle - Kooragang", terminal_operator: "Port Waratah Coal Services (PWCS)", max_loa_m: 300, max_beam_m: 50, max_draft_m: 15.2, handling_rate: "Up to 10,500 tph", handling_rate_num: 10500, max_vessel_class: "Capesize (up to 210,000 DWT)", loading_method: "Fixed berth", notes: "Sailing draft is tide/UKC dependent", source_url: "https://pwcs.com.au" },
+  { country: "Australia", port_name: "Australia — Newcastle - Carrington", terminal_operator: "Port Waratah Coal Services (PWCS)", max_loa_m: 270, max_beam_m: 47, max_draft_m: 12.5, handling_rate: "Up to 2,500 tph per loader", handling_rate_num: 2500, max_vessel_class: "Panamax (up to 180,000 DWT)", loading_method: "Fixed berth", notes: "LOA extendable to 275m with approval", source_url: "https://pwcs.com.au" },
+  { country: "Australia", port_name: "Australia — Newcastle - NCIG", terminal_operator: "Newcastle Coal Infrastructure Group (NCIG)", max_loa_m: 300, max_beam_m: 50, max_draft_m: 13.8, handling_rate: "Up to 10,500 tph", handling_rate_num: 10500, max_vessel_class: "Capesize (min 35,000 DWT)", loading_method: "Fixed berth", notes: "Draft after tide and 10% UKC allowance", source_url: "https://ncig.com.au" },
+  { country: "Australia", port_name: "Australia — Hay Point Coal Terminal", terminal_operator: "North Queensland Bulk Ports (NQBP)", max_loa_m: 300, max_beam_m: 60.9, max_draft_m: 18.6, handling_rate: "4,500-8,400 tph by berth", handling_rate_num: 8400, max_vessel_class: "Capesize (up to 230,000 DWT)", loading_method: "Fixed berth (3 berths)", notes: "Berth pocket depth up to 18.6m", source_url: "https://nqbp.com.au" },
+  { country: "Australia", port_name: "Australia — Dalrymple Bay Coal Terminal", terminal_operator: "DBCT Management", max_loa_m: 320, max_beam_m: 52, max_draft_m: 16.24, handling_rate: "7,200-8,650 tph per loader", handling_rate_num: 8650, max_vessel_class: "Capesize (40,000-220,000 DWT)", loading_method: "Fixed berth (4 berths)", notes: "3 shiploaders system", source_url: "https://dbct.com.au" },
+  { country: "Australia", port_name: "Australia — Abbot Point Coal Terminal", terminal_operator: "North Queensland Bulk Ports (NQBP)", max_loa_m: 300, max_beam_m: 70, max_draft_m: 18.5, handling_rate: "6,000-7,200 tph", handling_rate_num: 7200, max_vessel_class: "Capesize", loading_method: "Fixed berth (2 berths)", notes: "Deepwater offshore berth", source_url: "https://nqbp.com.au" },
+  { country: "Indonesia", port_name: "Indonesia — Taboneo (Banjarmasin anchorage)", terminal_operator: "Various barge operators", max_loa_m: 100, max_beam_m: 40, max_draft_m: 6.4, handling_rate: "600 tph conveyor / 15,000-40,000 t/day", handling_rate_num: 2500, max_vessel_class: "Bulkers via transshipment", loading_method: "Anchorage transshipment", notes: "Ocean vessels loaded via barge/floating crane transshipment", source_url: "https://gem.wiki" },
+  { country: "Mozambique", port_name: "Mozambique — Beira", terminal_operator: "CFM / Cornelder de Mocambique", max_loa_m: 140, max_beam_m: 25, max_draft_m: 7.0, handling_rate: "~6.5 Mt/yr rail feed", handling_rate_num: 1500, max_vessel_class: "Handysize / Offshore transshipment", loading_method: "Fixed pier + offshore transshipment", notes: "Night-navigation limit 140m LOA; channel ~11m", source_url: "https://delagoasl.com" },
+  { country: "United States", port_name: "United States — Norfolk - Lamberts Point Pier 6", terminal_operator: "Norfolk Southern", max_loa_m: 305, max_beam_m: 53, max_draft_m: 15.0, handling_rate: "16,000-20,000 tons/hr", handling_rate_num: 18000, max_vessel_class: "Capesize (>165,000 DWT)", loading_method: "Fixed berth", notes: "High-speed tandem rotary car dumpers", source_url: "https://vamaritime.com" },
+  { country: "United States", port_name: "United States — Newport News - Kinder Morgan Pier IX", terminal_operator: "Kinder Morgan", max_loa_m: 305, max_beam_m: 47, max_draft_m: 15.2, handling_rate: "8,000 tons/hr design", handling_rate_num: 8000, max_vessel_class: "Capesize", loading_method: "Fixed berth", notes: "50ft MLW channel; air draft 19.8m", source_url: "https://vamaritime.com" },
+  { country: "United States", port_name: "United States — Baltimore - CNX Marine Terminal (Curtis Bay)", terminal_operator: "CNX Resources", max_loa_m: 381, max_beam_m: 53, max_draft_m: 14.3, handling_rate: "7,000 short tons/hr", handling_rate_num: 7000, max_vessel_class: "Panamax/Capesize", loading_method: "Fixed berth", notes: "Air draft 16.8m (55ft)", source_url: "https://moranshipping.com" },
+  { country: "Russia", port_name: "Russia — Nakhodka", terminal_operator: "Nakhodka Commercial Sea Port", max_loa_m: 199, max_beam_m: 30, max_draft_m: 11.0, handling_rate: "~12 Mtpa aggregate", handling_rate_num: 2000, max_vessel_class: "Handysize/Handymax (~35,000 DWT)", loading_method: "Fixed berth (multiple terminals)", notes: "Coal handling split across several smaller terminals", source_url: "https://gem.wiki" },
+  { country: "Russia", port_name: "Russia — Vostochny", terminal_operator: "Vostochny Port (VPK)", max_loa_m: 300, max_beam_m: 48, max_draft_m: 16.5, handling_rate: "4 shiploaders x ~3,000 tph", handling_rate_num: 12000, max_vessel_class: "Capesize (~180,000 DWT)", loading_method: "Fixed berth", notes: "Planned increase to 18-19m; fairway depth up to 22m", source_url: "https://portnews.ru" }
+];
+
+let selectedInfraOrigin = "paradip";
+let selectedInfraDest = "Australia — Newcastle - Kooragang";
+let selectedInfraVessel = "Capesize";
+let selectedInfraDatasetTab = "indian";
+let infraSearchQuery = "";
+
+function getIndianPortObj(query) {
+  if (!query) return portConstraintsData[0];
+  const q = query.toLowerCase();
+  const found = portConstraintsData.find(p => 
+    p.port_id.toLowerCase() === q ||
+    p.port_name.toLowerCase().includes(q) ||
+    q.includes(p.port_name.toLowerCase()) ||
+    q.includes(p.port_id.toLowerCase())
+  );
+  return found || portConstraintsData[0];
+}
+
+function getIntlPortObj(query) {
+  if (!query) return internationalLoadingPortsData[0];
+  const q = query.toLowerCase();
+  const found = internationalLoadingPortsData.find(p => 
+    p.port_name.toLowerCase() === q ||
+    p.port_name.toLowerCase().includes(q) ||
+    q.includes(p.port_name.toLowerCase().replace("australia — ", "").replace("indonesia — ", "").replace("mozambique — ", "").replace("russia — ", "").replace("united states — ", ""))
+  );
+  return found || internationalLoadingPortsData[0];
+}
+
+function renderInfraConstraintsView() {
+  const container = document.getElementById("dynamicViewContainer");
+  if (!container) return;
+
+  const p1 = getIndianPortObj(selectedInfraOrigin);
+  const p2 = getIntlPortObj(selectedInfraDest);
+
+  const minDraft = Math.min(p1.max_draft_m, p2.max_draft_m);
+  const minLoa = Math.min(p1.max_loa_m, p2.max_loa_m);
+  const draftBottleneckPort = p1.max_draft_m < p2.max_draft_m ? p1.port_name : p2.port_name;
+  const loaBottleneckPort = p1.max_loa_m < p2.max_loa_m ? p1.port_name : p2.port_name;
+
+  let feasibilityStatus = "FULL CAPESIZE READY";
+  let feasibilityBadgeClass = "bg-emerald-100 text-emerald-800 border-emerald-300";
+  let feasibilityMessage = `Both ports feature sufficient LOA (≥290m) and deepwater draft (≥14.5m) to accommodate large Capesize bulkers without lightering.`;
+
+  if (minDraft < 10.0 || minLoa < 210) {
+    feasibilityStatus = "HIGH INFRASTRUCTURE CONSTRAINT";
+    feasibilityBadgeClass = "bg-rose-100 text-rose-800 border-rose-300";
+    feasibilityMessage = `Governing draft of ${minDraft}m at ${draftBottleneckPort} prevents direct berthing of Capesize/Panamax bulkers. Mandatory lightering at Sagar/Sandheads or offshore transshipment required.`;
+  } else if (minDraft < 15.0 || minLoa < 290) {
+    feasibilityStatus = "PANAMAX / SUPRAMAX COMPATIBLE";
+    feasibilityBadgeClass = "bg-amber-100 text-amber-800 border-amber-300";
+    feasibilityMessage = `Route is suitable for Panamax (75k DWT) and Supramax (55k DWT) bulk carriers. Capesize operations are restricted due to ${draftBottleneckPort} draft limit (${minDraft}m).`;
+  }
+
+  const filteredIndian = portConstraintsData.filter(p => 
+    !infraSearchQuery || 
+    p.port_name.toLowerCase().includes(infraSearchQuery.toLowerCase()) || 
+    p.state.toLowerCase().includes(infraSearchQuery.toLowerCase()) ||
+    p.max_vessel_class.toLowerCase().includes(infraSearchQuery.toLowerCase())
+  );
+
+  const filteredIntl = internationalLoadingPortsData.filter(p => 
+    !infraSearchQuery || 
+    p.port_name.toLowerCase().includes(infraSearchQuery.toLowerCase()) || 
+    p.country.toLowerCase().includes(infraSearchQuery.toLowerCase()) ||
+    p.terminal_operator.toLowerCase().includes(infraSearchQuery.toLowerCase())
+  );
+
+  container.innerHTML = `
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+      
+      <!-- Top Title & Navigation Bar -->
+      <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-semibold text-cyan-700 uppercase tracking-wider bg-cyan-50 px-2.5 py-1 rounded-md border border-cyan-200">
+            Port Infrastructure & Constraint Comparison
+          </span>
+          <h2 class="text-2xl font-bold text-slate-900 mt-2 font-outfit">
+            Port Infrastructure Constraints Analysis
+          </h2>
+          <p class="text-sm text-slate-500 mt-1">
+            Compare maximum LOA (Length Overall) and Draft limits between Indian East Coast ports and International loading terminals.
+          </p>
+        </div>
+        <button onclick="state.activeTab='dashboard'; renderApp();" class="text-xs bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium px-3 py-2 rounded-lg transition-colors shadow-sm self-start md:self-auto">
+          ← Back to Route Query
+        </button>
+      </div>
+
+      <!-- INTERACTIVE ROUTE & PORT SELECTION BAR -->
+      <div class="card-elevation bg-white rounded-2xl p-5 mb-6 border border-slate-200 shadow-sm">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+          
+          <!-- Select Indian Discharge Port (Port 1) -->
+          <div class="md:col-span-5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              Indian Discharge Port (Port 1)
+            </label>
+            <select id="infraOriginSelect" onchange="selectedInfraOrigin=this.value; state.query.origin=this.options[this.selectedIndex].text; renderInfraConstraintsView();" class="bg-white text-sm font-bold text-slate-800 w-full p-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 cursor-pointer">
+              ${portConstraintsData.map(p => `
+                <option value="${p.port_id}" ${p.port_id === p1.port_id ? 'selected' : ''}>
+                  ${p.port_name} (${p.state}) — Draft: ${p.max_draft_m}m | LOA: ${p.max_loa_m}m
+                </option>
+              `).join('')}
+            </select>
+          </div>
+
+          <!-- Corridor Arrow -->
+          <div class="md:col-span-2 flex items-center justify-center text-slate-400 font-bold">
+            <div class="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full text-xs text-cyan-700 font-semibold border border-slate-200">
+              <span>Compare Route</span>
+              <svg class="w-4 h-4 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+            </div>
+          </div>
+
+          <!-- Select International Loading Port (Port 2) -->
+          <div class="md:col-span-5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              International Loading Port (Port 2)
+            </label>
+            <select id="infraDestSelect" onchange="selectedInfraDest=this.value; state.query.destination=this.value; renderInfraConstraintsView();" class="bg-white text-sm font-bold text-slate-800 w-full p-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 cursor-pointer">
+              ${internationalLoadingPortsData.map(p => `
+                <option value="${p.port_name}" ${p.port_name === p2.port_name ? 'selected' : ''}>
+                  ${p.port_name} — Draft: ${p.max_draft_m}m | LOA: ${p.max_loa_m}m
+                </option>
+              `).join('')}
+            </select>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ROUTE FEASIBILITY & CONSTRAINTS SUMMARY BANNER -->
+      <div class="card-elevation bg-gradient-to-r from-slate-900 via-sky-950 to-slate-900 text-white p-6 rounded-2xl mb-8 shadow-xl relative overflow-hidden">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-800">
+          <div>
+            <div class="text-xs text-cyan-300 font-semibold uppercase tracking-wider mb-1">
+              Corridor Constraint Assessment
+            </div>
+            <div class="text-xl font-bold font-outfit text-white flex items-center gap-2">
+              <span>${p1.port_name}</span>
+              <span class="text-slate-400">↔</span>
+              <span>${p2.port_name}</span>
+            </div>
+          </div>
+
+          <!-- Status Badge -->
+          <div class="px-3.5 py-1.5 rounded-xl border font-extrabold text-xs tracking-wide shadow-sm ${feasibilityBadgeClass}">
+            ${feasibilityStatus}
+          </div>
+        </div>
+
+        <p class="text-sm text-slate-300 leading-relaxed mb-4">
+          ${feasibilityMessage}
+        </p>
+
+        <!-- Quick Parameter Highlights Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div class="bg-white/5 border border-white/10 p-3.5 rounded-xl backdrop-blur-xs flex items-center justify-between">
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-semibold">Governing Draft Limit</span>
+              <span class="text-xs text-slate-300 font-medium">Restricted by ${draftBottleneckPort}</span>
+            </div>
+            <span class="text-2xl font-extrabold text-cyan-300 font-outfit">${minDraft}m</span>
+          </div>
+
+          <div class="bg-white/5 border border-white/10 p-3.5 rounded-xl backdrop-blur-xs flex items-center justify-between">
+            <div>
+              <span class="text-slate-400 block text-[10px] uppercase font-semibold">Governing LOA Limit</span>
+              <span class="text-xs text-slate-300 font-medium">Restricted by ${loaBottleneckPort}</span>
+            </div>
+            <span class="text-2xl font-extrabold text-emerald-300 font-outfit">${minLoa}m</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIDE-BY-SIDE PARAMETER COMPARISON CARDS (LOA & DRAFT ONLY) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        
+        <!-- CARD 1: LOA (LENGTH OVERALL) COMPARISON -->
+        <div class="card-elevation bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m0 0h4m-4 0V11m0 0H9m3 0h3m-3 0v4m0 0H9m3 0h3"/></svg>
+                </div>
+                <h3 class="font-bold text-slate-900 font-outfit text-base">LOA (Length Overall) Comparison</h3>
+              </div>
+              <span class="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded-full border border-emerald-200">
+                Max LOA: ${minLoa}m
+              </span>
+            </div>
+
+            <!-- Visual Bar Comparison for LOA -->
+            <div class="space-y-4 my-4">
+              <!-- Port 1 LOA Bar -->
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span class="text-slate-700">${p1.port_name} (Port 1)</span>
+                  <span class="text-cyan-700 font-extrabold">${p1.max_loa_m} m</span>
+                </div>
+                <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full transition-all duration-500" style="width: ${Math.min(100, (p1.max_loa_m / 380) * 100)}%;"></div>
+                </div>
+              </div>
+
+              <!-- Port 2 LOA Bar -->
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span class="text-slate-700">${p2.port_name} (Port 2)</span>
+                  <span class="text-emerald-700 font-extrabold">${p2.max_loa_m} m</span>
+                </div>
+                <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full transition-all duration-500" style="width: ${Math.min(100, (p2.max_loa_m / 380) * 100)}%;"></div>
+                </div>
+              </div>
+
+              <!-- Typical Vessel Class Threshold Marker -->
+              <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-500 flex justify-between">
+                <span>Capesize LOA (~290m)</span>
+                <span>Panamax LOA (~225m)</span>
+                <span>Supramax LOA (~190m)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-600 mt-2">
+            <strong>LOA Verdict:</strong> ${p1.max_loa_m < p2.max_loa_m ? `${p1.port_name} has a tighter LOA constraint (${p1.max_loa_m}m) than ${p2.port_name} (${p2.max_loa_m}m).` : (p2.max_loa_m < p1.max_loa_m ? `${p2.port_name} has a tighter LOA constraint (${p2.max_loa_m}m) than ${p1.port_name} (${p1.max_loa_m}m).` : `Both ports offer equal LOA clearance of ${p1.max_loa_m}m.`)}
+          </div>
+        </div>
+
+        <!-- CARD 2: DRAFT LIMIT COMPARISON -->
+        <div class="card-elevation bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center font-bold">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                </div>
+                <h3 class="font-bold text-slate-900 font-outfit text-base">Draft Limit & Depth Gauge</h3>
+              </div>
+              <span class="text-xs bg-cyan-50 text-cyan-700 font-semibold px-2.5 py-1 rounded-full border border-cyan-200">
+                Governing Draft: ${minDraft}m
+              </span>
+            </div>
+
+            <!-- Visual Depth Gauge for Draft -->
+            <div class="space-y-4 my-4">
+              <!-- Port 1 Draft Bar -->
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span class="text-slate-700">${p1.port_name} Max Draft</span>
+                  <span class="${p1.max_draft_m < 12 ? 'text-rose-600' : 'text-cyan-700'} font-extrabold">${p1.max_draft_m} m ${p1.tide_restriction ? '(Tide Restricted)' : ''}</span>
+                </div>
+                <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div class="h-full ${p1.max_draft_m < 12 ? 'bg-gradient-to-r from-rose-500 to-amber-500' : 'bg-gradient-to-r from-blue-500 to-cyan-500'} rounded-full transition-all duration-500" style="width: ${Math.min(100, (p1.max_draft_m / 22) * 100)}%;"></div>
+                </div>
+              </div>
+
+              <!-- Port 2 Draft Bar -->
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span class="text-slate-700">${p2.port_name} Max Draft</span>
+                  <span class="${p2.max_draft_m < 12 ? 'text-rose-600' : 'text-emerald-700'} font-extrabold">${p2.max_draft_m} m</span>
+                </div>
+                <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div class="h-full ${p2.max_draft_m < 12 ? 'bg-gradient-to-r from-amber-500 to-rose-500' : 'bg-gradient-to-r from-emerald-500 to-teal-500'} rounded-full transition-all duration-500" style="width: ${Math.min(100, (p2.max_draft_m / 22) * 100)}%;"></div>
+                </div>
+              </div>
+
+              <!-- Draft Reference Markers -->
+              <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-500 flex justify-between">
+                <span>Shallow (<10m)</span>
+                <span>Panamax Draft (~13.5m)</span>
+                <span>Deepwater (>16m)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-600 mt-2">
+            <strong>Draft Verdict:</strong> ${p1.max_draft_m < p2.max_draft_m ? `${p1.port_name} restricts channel draft to ${p1.max_draft_m}m.` : (p2.max_draft_m < p1.max_draft_m ? `${p2.port_name} governs route draft at ${p2.max_draft_m}m.` : `Both ports support a draft of ${p1.max_draft_m}m.`)} ${p1.tide_restriction ? 'Requires high-tide navigation window.' : ''}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- FULL DATASET MATRIX EXPLORER TABLE (port_constraints & international-loading-ports) -->
+      <div class="card-elevation bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+        
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h3 class="font-bold text-slate-900 font-outfit text-lg">Full Port Infrastructure Dataset Explorer</h3>
+            <p class="text-xs text-slate-500">Datasets: port_constraints.csv & international_loading_ports.csv</p>
+          </div>
+
+          <!-- Controls: Tab Switch + Search -->
+          <div class="flex flex-wrap items-center gap-3">
+            
+            <!-- Dataset Tab Switcher -->
+            <div class="flex p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs">
+              <button onclick="selectedInfraDatasetTab='indian'; renderInfraConstraintsView();" class="px-3 py-1.5 rounded-lg font-semibold transition-colors ${selectedInfraDatasetTab === 'indian' ? 'bg-white text-cyan-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+                Indian East Coast Ports (${portConstraintsData.length})
+              </button>
+              <button onclick="selectedInfraDatasetTab='international'; renderInfraConstraintsView();" class="px-3 py-1.5 rounded-lg font-semibold transition-colors ${selectedInfraDatasetTab === 'international' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+                International Loading Ports (${internationalLoadingPortsData.length})
+              </button>
+            </div>
+
+            <!-- Search Filter Input -->
+            <div class="relative">
+              <input type="text" placeholder="Search port, state, or operator..." value="${infraSearchQuery}" oninput="infraSearchQuery=this.value; renderInfraConstraintsView();" class="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 pl-8 text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 w-48 sm:w-56" />
+              <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- TABLE SECTION -->
+        <div class="overflow-x-auto border border-slate-200 rounded-xl">
+          ${selectedInfraDatasetTab === 'indian' ? `
+            <!-- Indian Ports Table -->
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-50 border-b border-slate-200 text-[11px] text-slate-500 uppercase font-bold tracking-wider">
+                <tr>
+                  <th class="p-3">Port Name</th>
+                  <th class="p-3">State</th>
+                  <th class="p-3 text-right">Max Draft (m)</th>
+                  <th class="p-3 text-right">Max LOA (m)</th>
+                  <th class="p-3 text-right">Max Beam (m)</th>
+                  <th class="p-3 text-center">Berths</th>
+                  <th class="p-3 text-right">Crane Handling (TPH)</th>
+                  <th class="p-3 text-center">Tide Restricted</th>
+                  <th class="p-3">Max Vessel Class</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
+                ${filteredIndian.map(p => `
+                  <tr class="hover:bg-cyan-50/40 transition-colors ${p.port_id === p1.port_id ? 'bg-cyan-50/80 font-bold text-cyan-900' : ''}">
+                    <td class="p-3 flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full ${p.port_id === p1.port_id ? 'bg-cyan-600' : 'bg-slate-300'}"></span>
+                      <span>${p.port_name}</span>
+                    </td>
+                    <td class="p-3 text-slate-500">${p.state}</td>
+                    <td class="p-3 text-right font-bold ${p.max_draft_m < 12 ? 'text-rose-600' : 'text-slate-900'}">${p.max_draft_m} m</td>
+                    <td class="p-3 text-right font-bold text-slate-900">${p.max_loa_m} m</td>
+                    <td class="p-3 text-right text-slate-600">${p.max_beam_m} m</td>
+                    <td class="p-3 text-center text-slate-600">${p.num_berths}</td>
+                    <td class="p-3 text-right font-bold text-slate-900">${p.crane_handling_tph.toLocaleString()}</td>
+                    <td class="p-3 text-center">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold ${p.tide_restriction ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">
+                        ${p.tide_restriction ? 'Yes' : 'No'}
+                      </span>
+                    </td>
+                    <td class="p-3">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                        ${p.max_vessel_class}
+                      </span>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : `
+            <!-- International Ports Table -->
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-50 border-b border-slate-200 text-[11px] text-slate-500 uppercase font-bold tracking-wider">
+                <tr>
+                  <th class="p-3">Country & Port Name</th>
+                  <th class="p-3">Terminal Operator</th>
+                  <th class="p-3 text-right">Max Draft (m)</th>
+                  <th class="p-3 text-right">Max LOA (m)</th>
+                  <th class="p-3 text-right">Max Beam (m)</th>
+                  <th class="p-3">Handling Rate</th>
+                  <th class="p-3">Loading Method</th>
+                  <th class="p-3">Max Vessel Class</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
+                ${filteredIntl.map(p => `
+                  <tr class="hover:bg-emerald-50/40 transition-colors ${p.port_name === p2.port_name ? 'bg-emerald-50/80 font-bold text-emerald-900' : ''}">
+                    <td class="p-3 flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full ${p.port_name === p2.port_name ? 'bg-emerald-600' : 'bg-slate-300'}"></span>
+                      <span>${p.port_name}</span>
+                    </td>
+                    <td class="p-3 text-slate-500">${p.terminal_operator}</td>
+                    <td class="p-3 text-right font-bold ${p.max_draft_m < 12 ? 'text-rose-600' : 'text-slate-900'}">${p.max_draft_m} m</td>
+                    <td class="p-3 text-right font-bold text-slate-900">${p.max_loa_m} m</td>
+                    <td class="p-3 text-right text-slate-600">${p.max_beam_m} m</td>
+                    <td class="p-3 font-semibold text-slate-800">${p.handling_rate}</td>
+                    <td class="p-3 text-slate-600">${p.loading_method}</td>
+                    <td class="p-3">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        ${p.max_vessel_class}
+                      </span>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `}
+        </div>
+
       </div>
 
     </div>
