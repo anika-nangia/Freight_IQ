@@ -1,0 +1,228 @@
+{
+  "audited_at": "2026-09-30T19:28:16+05:30",
+  "purpose": "Detect datasets that are present, look authoritative, and are not grounded in an identifiable observation.",
+  "declared_provenance": {
+    "route_rates_weekly": {
+      "tier": "unverified",
+      "loaded": true
+    },
+    "port_lineups": {
+      "tier": "observed",
+      "loaded": true
+    },
+    "berth_status": {
+      "tier": "observed",
+      "loaded": true
+    },
+    "port_constraints": {
+      "tier": "observed",
+      "loaded": true
+    },
+    "loading_port_constraints": {
+      "tier": "observed",
+      "loaded": true
+    },
+    "vessel_specs": {
+      "tier": "observed",
+      "loaded": true
+    },
+    "world_bank_pink_sheet": {
+      "tier": "observed",
+      "loaded": true
+    },
+    "port_weather": {
+      "tier": "observed",
+      "loaded": true
+    },
+    "fx_usd_inr": {
+      "tier": "observed",
+      "loaded": true
+    },
+    "bdi_subindices": {
+      "tier": "unavailable",
+      "loaded": false
+    }
+  },
+  "route_rates": {
+    "available": true,
+    "rows": 286,
+    "signals": {
+      "return_autocorrelation": {
+        "n_series": 11,
+        "high": 10,
+        "share_above_threshold": 0.909,
+        "mean_autocorr": 0.503,
+        "flag": true,
+        "threshold": 0.35,
+        "examples": {
+          "Nikolaev->Paradip|Panamax": 0.489,
+          "Nikolaev->Paradip|Supramax": 0.539,
+          "Nikolaev->Paradip/Haldia|Panamax": 0.486,
+          "Nikolaev->Paradip/Haldia|Supramax": 0.538
+        }
+      },
+      "cross_series_target_correlation": {
+        "mean": 0.9,
+        "min": 0.518,
+        "n_pairs": 55,
+        "flag": true
+      },
+      "fixed_multiple_pairs": {
+        "reference": "('Nikolaev->Paradip', 'Panamax')",
+        "n_near_constant": 3,
+        "threshold_log_std": 0.05,
+        "examples": {
+          "('Nikolaev->Paradip/Haldia', 'Panamax')": 0.00112,
+          "('Nikolaev->Paradip', 'Supramax')": 0.01481,
+          "('Nikolaev->Paradip/Haldia', 'Supramax')": 0.01508
+        }
+      },
+      "cargo_size_per_lane": {
+        "median_unique_sizes": 1.0,
+        "lanes_with_single_size": 11,
+        "n_lanes": 11
+      }
+    },
+    "granularity": {
+      "available": true,
+      "n": 286,
+      "decimals": 0,
+      "share_multiple_of_1000": 1.0,
+      "flag": true
+    }
+  },
+  "port_lineups": {
+    "rows": 3133,
+    "distinct_vessels": 752,
+    "snapshot_dates": 12,
+    "status_values": [
+      "Expected",
+      "Waiting",
+      "Waiting & Expected",
+      "Working"
+    ],
+    "has_completion_status": false,
+    "etcd_revised_between_snapshots": {
+      "vessels_seen_more_than_once": 437,
+      "of_which_etcd_changed": 320,
+      "interpretation": "a live schedule, not a recorded outcome"
+    },
+    "granularity": {
+      "available": true,
+      "n": 2770,
+      "decimals": 3,
+      "share_multiple_of_1000": 0.431,
+      "flag": false
+    }
+  },
+  "berth_cross_consistency": {
+    "available": true,
+    "berth_operations_status_values": {
+      "Vacant": 452
+    },
+    "berth_operations_is_all_one_status": true,
+    "per_port": [
+      {
+        "port": "DHAMRA",
+        "berths_listed_vacant": 4,
+        "berths_shown_occupied": 14,
+        "overlap": 3
+      },
+      {
+        "port": "GANGAVARAM",
+        "berths_listed_vacant": 9,
+        "berths_shown_occupied": 17,
+        "overlap": 9
+      },
+      {
+        "port": "GOPALPUR",
+        "berths_listed_vacant": 3,
+        "berths_shown_occupied": 3,
+        "overlap": 3
+      },
+      {
+        "port": "KATTUPALLI",
+        "berths_listed_vacant": 4,
+        "berths_shown_occupied": 1,
+        "overlap": 1
+      },
+      {
+        "port": "KRISHNAPATNAM",
+        "berths_listed_vacant": 13,
+        "berths_shown_occupied": 14,
+        "overlap": 12
+      },
+      {
+        "port": "VISAKHAPATNAM",
+        "berths_listed_vacant": 34,
+        "berths_shown_occupied": 43,
+        "overlap": 23
+      }
+    ],
+    "n_contradicting_ports": 6,
+    "verdict": "CONTRADICTORY: berth_operations lists every berth Vacant on the same dates the line-up shows vessels occupying those berths"
+  },
+  "reference_tables": {
+    "port_constraints": {
+      "rows": 7,
+      "columns": 13,
+      "constant_columns": []
+    },
+    "vessel_specs": {
+      "rows": 5,
+      "columns": 12,
+      "constant_columns": []
+    },
+    "loading_port_constraints": {
+      "rows": 13,
+      "columns": 11,
+      "constant_columns": [],
+      "rows_with_source_url": 13,
+      "distinct_source_domains": 9
+    }
+  },
+  "external_sources": {
+    "world_bank_pink_sheet": {
+      "available": true,
+      "rows": 792,
+      "verification": "downloaded from the publisher's API; content is the publisher's, not generated here",
+      "source_url": "https://thedocs.worldbank.org/en/doc/18675f1d1639c7a34d463f59263ba0a2-0050012025/related/CMO-Historical-Data-Monthly.xlsx",
+      "period": [
+        "1960-01-01",
+        "2025-12-01"
+      ]
+    },
+    "port_weather": {
+      "available": true,
+      "rows": 2765,
+      "verification": "downloaded from the publisher's API; content is the publisher's, not generated here",
+      "source_url": "https://archive-api.open-meteo.com/v1/archive",
+      "period": [
+        "2025-09-01",
+        "2026-09-30"
+      ]
+    },
+    "fx_usd_inr": {
+      "available": true,
+      "rows": 702,
+      "verification": "downloaded from the publisher's API; content is the publisher's, not generated here",
+      "source_url": "https://api.frankfurter.dev/v1/",
+      "period": [
+        "2023-12-29",
+        "2026-09-29"
+      ]
+    }
+  },
+  "verdicts": [
+    {
+      "dataset": "route_rates_weekly",
+      "verdict": "GENERATED-SUSPECT",
+      "detail": "4/4 generator signatures present"
+    },
+    {
+      "dataset": "berth_status",
+      "verdict": "NOT USABLE AS OCCUPANCY DATA",
+      "detail": "all rows Vacant; contradicts the line-up at 6 ports on the same dates"
+    }
+  ]
+}

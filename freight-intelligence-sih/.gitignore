@@ -1,0 +1,32 @@
+# Bytecode and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Environments
+.venv/
+venv/
+env/
+
+# Editors
+.vscode/
+.idea/
+
+# Local database
+backend/database/*.db
+backend/database/*.db-wal
+backend/database/*.db-shm
+
+# NOTE on data/ and models/artifacts/
+#
+# These ARE committed, deliberately: the trained models and the fetched external data
+# are the evidence behind every number the API returns, and a reviewer needs them
+# without running the pipeline.
+#
+# data/raw/ holds the World Bank source workbook (765 KB) and is committed so the
+# commodity series can be rebuilt offline.
+
+# Large or regenerable local scratch
+*.log
+.DS_Store
+Thumbs.db

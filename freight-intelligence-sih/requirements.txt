@@ -1,0 +1,42 @@
+# Runtime dependencies for the FreightIQ backend and data pipeline.
+#
+# PINS ARE DELIBERATE for scikit-learn and xgboost, not a style choice.
+#
+# The congestion artifact (models/artifacts/congestion_model.pkl) is a pickle of a
+# fitted sklearn estimator, so it is version-coupled. The library version it was fitted
+# with is recorded inside the artifact itself, and both models regenerate their metrics
+# from the data on every run, so a rebuild on a different minor version is supported
+# rather than blocked.
+#
+# Verified on Python 3.14 with scikit-learn 1.8.0 and 1.9.1; the full test suite passes
+# on both. Python 3.12 was also used and produced the same qualitative results, though
+# the exact regret figures move within the seed range reported in the model card.
+
+# --- API
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+pydantic>=2.7,<3.0
+
+# --- Data
+numpy>=1.26
+pandas>=2.1
+openpyxl>=3.1          # reads the World Bank Pink Sheet workbook
+
+# --- Models
+#
+# scikit-learn is constrained to a minor-version range rather than pinned exactly.
+# The congestion artifact is a pickle of a fitted estimator, so it IS version-coupled,
+# and loading it under a different sklearn can raise InconsistentVersionWarning. The
+# full test suite has been run on both 1.8.0 and 1.9.1 and passes on each, so a hard
+# pin was over-restrictive: it blocked a working environment for no gain.
+#
+# If you do rebuild on a different minor version, expect the Model 1 held-out numbers
+# to move. The seed range in models/artifacts/freight_model_card.md is what to compare
+# a rebuild against, not a single figure.
+scikit-learn>=1.8,<2.0
+xgboost>=3.0,<4.0
+statsmodels>=0.14,<0.16   # per-lane ARIMA baseline
+
+# --- Tests
+pytest>=8.0
+httpx>=0.27            # FastAPI TestClient transport

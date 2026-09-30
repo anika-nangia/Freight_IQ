@@ -1,66 +1,176 @@
 """
-Pillar (a): Optimal Market Entry Timing Service
-Evaluates forecasted rate trajectory momentum to recommend:
-'Lock Contract Now (Within 3 Days)' vs 'Hold on Spot Market; Secure Mid-Term in 2 Weeks'.
-"""
+Pillar (a): Market Entry Timing.
 
-from typing import Dict, Any, List
+Turns a forecast into a charter/wait/fix decision.
+
+The previous version compared a projected 14-day rate against a single spot number and
+applied a +/-3% threshold. Two problems: the 3% was a magic number, and the decision
+ignored the interval entirely, so a forecast of +2% that was statistically
+indistinguishable from zero produced the same "BALANCED" verdict as a confident +2%.
+
+The decision here is built on measured quantities instead:
+  * the modelled move, expressed as a share of the interval half-width, so a small
+    move inside a wide band reads as 'no signal' rather than a weak signal;
+  * the asymmetric cost of being wrong, which is what the model is actually
+    optimised for;
+  * the cost of waiting, in dollars per tonne and in days of delay.
+"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from data_pipeline import provenance as prov  # noqa: E402
+
+# A move counts as a signal only once it is large relative to the interval the model
+# can actually resolve. 0.5 means "half the 80% band".
+SIGNAL_THRESHOLD = 0.5
+# Cost of a day's delay, used to price the wait option. This is a business assumption,
+# not a measured quantity, and is returned in the response so it can be challenged.
+DEFAULT_DEMURAGE_USD_PER_DAY = 18500.0
+
 
 class MarketTimingService:
-    def evaluate_timing(
-        self,
-        current_spot: float,
-        projections: List[Dict[str, Any]],
-        volatility_pct: float = 4.5
-    ) -> Dict[str, Any]:
+    def evaluate(self, forecast: Dict[str, Any],
+                 demurrage_usd_per_day: float = DEFAULT_DEMURAGE_USD_PER_DAY) -> Dict[str, Any]:
+        """Recommend charter now, wait, or fix a multi-voyage deal.
+
+        `forecast` is the response from models.model_2_freight.predict_freight.FreightPredictor.
         """
-        Calculates forecast slope and generates actionable timing advice.
-        """
-        rate_7d = projections[0]["projected_rate"] if len(projections) > 0 else current_spot
-        rate_14d = projections[1]["projected_rate"] if len(projections) > 1 else current_spot
-        rate_30d = projections[2]["projected_rate"] if len(projections) > 2 else current_spot
-        
-        diff_14d = rate_14d - current_spot
-        slope_pct = (diff_14d / current_spot) * 100
-        
-        if slope_pct > 3.0:
-            action = "LOCK CONTRACT NOW"
-            horizon_window = "Within 48 to 72 Hours"
-            hedge_savings = round(diff_14d, 2)
-            headline = f"Lock Contract Now (Within 3 Days) to hedge against an estimated ${hedge_savings}/ton spike."
+        if not forecast.get("available"):
+            return {
+                "available": False,
+                "action": "NO RECOMMENDATION",
+                "reason": forecast.get("reason", "forecast unavailable"),
+                "provenance": forecast.get("provenance"),
+            }
+
+        spot = float(forecast["current_observed_rate_usd_mt"])
+        point = float(forecast["forecast_rate_usd_mt"])
+        lo = float(forecast["lower_bound_usd_mt"])
+        hi = float(forecast["upper_bound_usd_mt"])
+        half_width = (hi - lo) / 2.0
+        move = point - spot
+        strength = abs(move) / half_width if half_width > 0 else 0.0
+
+        as_of = forecast.get("current_observed_rate_as_of")
+        horizon_days = int(forecast.get("horizon_days", 14))
+
+        if strength < SIGNAL_THRESHOLD:
+            action = "HOLD / MONITOR"
+            badge = "amber"
+            headline = (f"Forecast move of {move:+.2f} USD/MT is inside the 80% band "
+                        f"({lo:.2f} to {hi:.2f}). Not a tradable signal.")
             rationale = [
-                f"14-day forward rate projection indicates a +{round(slope_pct, 1)}% momentum upward.",
-                f"Historical volatility is currently {volatility_pct}%; upward asymmetric risk is elevated.",
-                f"Securing vessel charter commitments today protects cargo margins from port queue premiums."
+                f"The model moves the rate {move:+.2f} USD/MT over {horizon_days} days, "
+                f"which is {strength:.0%} of the interval half-width.",
+                "Thresholds below " + f"{SIGNAL_THRESHOLD:.0%} of the band are treated as no signal.",
+                "A confident call here would be a false precision, because the interval "
+                "is wide relative to the predicted move.",
             ]
-            badge_color = "emerald"
-        elif slope_pct < -3.0:
-            action = "HOLD ON SPOT MARKET"
-            horizon_window = "Secure Mid-Term Charter in 2 Weeks"
-            savings = round(abs(diff_14d), 2)
-            headline = f"Hold on spot market; secure mid-term charter in 2 weeks to save ~${savings}/ton."
+            cost_of_waiting = None
+        elif move > 0:
+            action = "CHARTER NOW"
+            badge = "emerald"
+            headline = (f"Model points {move:+.2f} USD/MT higher over {horizon_days} days, "
+                        f"which is {strength:.0%} of the interval width. Fix before it lands.")
             rationale = [
-                f"Freight market is easing by {round(abs(slope_pct), 1)}% due to incoming ballast fleet availability.",
-                "Short-term spot bookings recommended for immediate requirements.",
-                "Delay multi-voyage contract fixation until bottom of the 14-day cycle is reached."
+                f"Observed rate {spot:.2f} USD/MT as of {as_of}; forecast {point:.2f} "
+                f"(80% band {lo:.2f} to {hi:.2f}).",
+                "Under-forecasting is penalised 2.5x in the training objective, so the "
+                "upper side of the band is the one to protect.",
+                f"Waiting {horizon_days} days costs roughly "
+                f"{demurrage_usd_per_day * horizon_days:,.0f} USD in demurrage exposure at "
+                f"{demurrage_usd_per_day:,.0f} USD/day.",
             ]
-            badge_color = "blue"
+            cost_of_waiting = demurrage_usd_per_day * horizon_days
         else:
-            action = "MONITOR WITH GUARDRAILS"
-            horizon_window = "Watch 7-Day Window"
-            headline = "Market in balanced equilibrium. Fix spot contracts with standard laycan clauses."
+            action = "WAIT / BOOK SPOT"
+            badge = "blue"
+            headline = (f"Model points {move:+.2f} USD/MT lower over {horizon_days} days, "
+                        f"which is {strength:.0%} of the interval width. Spot is the better buy.")
             rationale = [
-                "Rate trajectory is displaying sideways range-bound movement within ±2.5%.",
-                "Keep contract durations flexible between 15 to 30 days."
+                f"Observed rate {spot:.2f} USD/MT as of {as_of}; forecast {point:.2f} "
+                f"(80% band {lo:.2f} to {hi:.2f}).",
+                "Falling rates make a fixed commitment expensive and a spot booking flexible.",
+                "This is a directional read on a 20-week history, so a single voyage is "
+                "the appropriate exposure.",
             ]
-            badge_color = "amber"
-            
-        return {
+            cost_of_waiting = 0.0
+
+        out = {
+            "available": True,
             "action": action,
-            "horizon_window": horizon_window,
+            "badge_color": badge,
             "headline": headline,
-            "slope_momentum_pct": round(slope_pct, 2),
-            "estimated_price_delta_14d": round(diff_14d, 2),
             "rationale": rationale,
-            "badge_color": badge_color
+            "current_observed_rate_usd_mt": round(spot, 2),
+            "forecast_rate_usd_mt": round(point, 2),
+            "lower_bound_usd_mt": round(lo, 2),
+            "upper_bound_usd_mt": round(hi, 2),
+            "modelled_move_usd_mt": round(move, 2),
+            "signal_strength_vs_interval": round(strength, 3),
+            "signal_threshold": SIGNAL_THRESHOLD,
+            "reads_as_signal": bool(strength >= SIGNAL_THRESHOLD),
+            "as_of": as_of,
+            "horizon_days": horizon_days,
+            "cost_of_waiting_usd": cost_of_waiting,
+            "demurrage_assumption_usd_per_day": demurrage_usd_per_day,
+            "demurrage_note": "A business assumption supplied by the caller, not a measured "
+                              "value. Replace it with your charter party's rate.",
         }
+        out["provenance"] = prov.provenance_block(["route_rates_weekly"])
+        out["confidence"] = forecast.get("confidence")
+        return out
+
+    def compare_contract(self, contract_path: Dict[str, Any], n_voyages: int = 3) -> Dict[str, Any]:
+        """Spot-every-voyage versus fixing N voyages at today's rate.
+
+        `contract_path` is the response from FreightPredictor.contract_path(). This is a
+        breakeven calculation on an expected path, not a prediction of market direction.
+        """
+        if not contract_path.get("available"):
+            return {"available": False, "reason": contract_path.get("reason"),
+                    "provenance": contract_path.get("provenance")}
+        months = contract_path.get("monthly_path")
+        if not months:
+            return {"available": False,
+                    "reason": "contract path carries no monthly path"}
+        spot = float(contract_path["spot_today_usd_mt"])
+        avg = sum(m["expected_average_rate_usd_mt"] for m in months) / len(months)
+        diff = avg - spot
+        return {
+            "available": True,
+            "corridor_id": contract_path.get("corridor_id"),
+            "voyages": n_voyages,
+            "fix_n_voyages_at_today_total_usd_per_tonne": round(spot * n_voyages, 2),
+            "expected_spot_total_usd_per_tonne": round(avg * n_voyages, 2),
+            "expected_difference_usd_per_tonne": round(diff * n_voyages, 2),
+            "favours": "fix now" if diff > 0 else "stay spot",
+            "breakeven_average_rate_usd_mt": round(spot, 2),
+            "downside_average_rate_usd_mt": round(
+                sum(m["downside_usd_mt"] for m in months) / len(months), 2),
+            "upside_average_rate_usd_mt": round(
+                sum(m["upside_usd_mt"] for m in months) / len(months), 2),
+            "basis": "expected average of the derived 6-month path versus the observed rate",
+            "path_warning": contract_path.get("path_warning"),
+            "caveat": "This is an expected-value comparison. It ignores the variance of "
+                      "the path, and the downside column shows how much of the decision "
+                      "rests on a single favourable sequence.",
+            "provenance": contract_path.get("provenance"),
+            "confidence": contract_path.get("confidence"),
+        }
+
+
+_TIMING: Optional[MarketTimingService] = None
+
+
+def get_service() -> MarketTimingService:
+    global _TIMING
+    if _TIMING is None:
+        _TIMING = MarketTimingService()
+    return _TIMING

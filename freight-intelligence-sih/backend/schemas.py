@@ -1,10 +1,15 @@
 """
-Pydantic v2 Schemas for FreightIQ API
-"""
+Pydantic v2 schemas.
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List, Dict, Any
+The old `RecommendationResponse` was never used by any route and did not match what
+the endpoints actually returned. The request schemas are kept, with the additions the
+real predictors need (n_voyages, demurrage rate), and the response schemas describe
+what is genuinely returned.
+"""
+from pydantic import BaseModel, Field, field_validator
+from typing import Any, Dict, List, Optional
 import re
+
 
 class LoginRequest(BaseModel):
     login_type: str = Field(..., description="'email' or 'phone'")
@@ -15,26 +20,27 @@ class LoginRequest(BaseModel):
     company: Optional[str] = "Steel Authority of India Limited (SAIL)"
 
     @field_validator("email")
-    def validate_and_clean_email(cls, v, values):
+    @classmethod
+    def validate_email(cls, v):
         if v:
             cleaned = v.strip().lower()
-            # Strict RFC-compliant regex
             pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
             if not re.match(pattern, cleaned):
-                raise ValueError("Invalid email format. Please provide a standard address, e.g., name@domain.com")
+                raise ValueError("Invalid email format. Provide a standard address, "
+                                 "e.g. name@domain.com")
             return cleaned
         return v
 
     @field_validator("phone")
+    @classmethod
     def validate_phone(cls, v):
         if v:
-            cleaned = re.sub(r"[^\d+]", "", v.strip())
-            # Basic validation for 10-digit or +91 standard mobile numbers
-            digits = re.sub(r"\D", "", cleaned)
+            digits = re.sub(r"\D", "", v.strip())
             if len(digits) < 10 or len(digits) > 13:
                 raise ValueError("Invalid phone number. Must contain 10 digits (e.g. +91 98765 43210)")
-            return cleaned
+            return re.sub(r"[^\d+]", "", v.strip())
         return v
+
 
 class UserResponse(BaseModel):
     id: str
@@ -45,49 +51,49 @@ class UserResponse(BaseModel):
     role: str
     token: str
 
+
 class RouteQueryRequest(BaseModel):
-    origin: str = Field(..., example="Paradip")
-    destination: str = Field(..., example="Qingdao")
-    vessel_class: str = Field(default="Supramax", example="Supramax")
-    cargo_type: str = Field(default="Coking Coal", example="Coking Coal")
-    cargo_volume_mt: float = Field(default=55000.0, example=55000.0)
-    contract_horizon_days: int = Field(default=30, example=30)
-    scenario_weights: Optional[Dict[str, float]] = Field(
-        default_factory=lambda: {"weather": 1.0, "congestion": 1.0, "bdi": 1.0, "fx": 1.0}
-    )
+    origin: str = Field(..., json_schema_extra={"example": "Xingang"},
+                        description="Loading port or terminal. Must match a corridor with "
+                                    "observed rate history to receive a forecast.")
+    destination: str = Field(..., json_schema_extra={"example": "Paradip"})
+    vessel_class: str = Field(default="Supramax",
+                              description="Handysize, Handymax, Supramax, Panamax or Capesize")
+    cargo_type: str = Field(default="Coking Coal")
+    cargo_volume_mt: float = Field(default=55000.0, gt=0)
+    n_voyages: int = Field(default=3, ge=1, le=20,
+                           description="Voyages to compare spot against a fixed contract")
+    demurrage_usd_per_day: float = Field(default=18500.0, gt=0,
+                                         description="Your demurrage rate. Used to price the "
+                                                     "cost of waiting; not a market value.")
+    day_rate_usd: Optional[float] = Field(default=None, gt=0,
+                                          description="Vessel day rate, for idle-cost exposure")
 
-class ModelValuationMetrics(BaseModel):
-    rmse_usd_ton: float
-    mae_usd_ton: float
-    r2_score: float
-    backtest_accuracy_pct: float
-    asymmetric_regret_score: float
-    regret_reduction_pct: float
 
-class ForecastTrajectoryPoint(BaseModel):
-    horizon_days: int
-    target_date: str
-    projected_rate: float
-    lower_bound: float
-    upper_bound: float
+class ContractQueryRequest(BaseModel):
+    origin: str
+    destination: str
+    vessel_class: str = "Supramax"
+    n_voyages: int = Field(default=3, ge=1, le=20)
 
-class RecommendationResponse(BaseModel):
-    # Pillar A: Market Timing
-    market_timing: Dict[str, Any]
-    # Pillar B: Vessel Optimization
-    vessel_optimization: Dict[str, Any]
-    # Pillar D: Risk Mitigation
-    risk_mitigation: Dict[str, Any]
-    # Explainability & SHAP
-    shap_breakdown: Dict[str, float]
-    counterfactual_scenarios: List[Dict[str, Any]]
 
-class IdleAnalysisResponse(BaseModel):
-    discharge_port: str
-    vessel_class: str
-    daily_charter_rate_usd: float
-    deadhead_risk_tier: str
-    idle_scenarios: List[Dict[str, Any]]
-    repositioning_alert: str
-    suggested_alternative_ports: List[Dict[str, Any]]
-    workers_advisory: str
+class DataCoverageResponse(BaseModel):
+    datasets: List[Dict[str, Any]]
+    summary: Dict[str, int]
+
+
+class ModelReportResponse(BaseModel):
+    model_1_congestion: Dict[str, Any]
+    model_2_freight: Dict[str, Any]
+
+
+class ProvenanceBlock(BaseModel):
+    datasets: List[Dict[str, Any]]
+    generated_at: str
+
+
+class Envelope(BaseModel):
+    """Every endpoint returns this shape, or an explicit `available: false`."""
+    available: bool = True
+    provenance: ProvenanceBlock
+    confidence: Optional[Dict[str, Any]] = None

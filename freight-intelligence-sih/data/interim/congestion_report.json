@@ -1,0 +1,123 @@
+{
+  "built_at": "2026-09-30T09:21:21+00:00",
+  "target": "estimated_port_stay_days",
+  "target_definition": "etc_or_etcd minus arrival_or_eta, read at the first snapshot where the vessel is recorded as Working and its arrival date has passed",
+  "target_is_an_estimate": true,
+  "why_it_is_an_estimate": "The line-up data contains no actual completion, departure or sailing field. Status values are only Expected / Waiting / Waiting & Expected / Working, so no voyage is ever recorded as finished. The target is therefore the port's own published schedule, not a measured turnaround. This model predicts the port's estimate.",
+  "no_realised_turnaround_available": true,
+  "rows": 347,
+  "voyages_with_etcd_total": 674,
+  "voyages_kept": 347,
+  "voyages_dropped_not_yet_berthed_or_arrival_is_eta": 327,
+  "ports": 10,
+  "snapshot_dates": [
+    "2026-08-10",
+    "2026-08-11",
+    "2026-08-12",
+    "2026-08-13",
+    "2026-08-17",
+    "2026-08-18",
+    "2026-08-21",
+    "2026-08-24",
+    "2026-08-25",
+    "2026-08-26",
+    "2026-08-27",
+    "2026-08-31"
+  ],
+  "features": [
+    "queue_waiting",
+    "vessels_awaiting_berth",
+    "vessels_working",
+    "berths_total",
+    "berth_occupancy",
+    "queue_ratio",
+    "vessels_expected",
+    "arrivals_next_7d",
+    "working_import",
+    "working_export",
+    "cargo_tonnage",
+    "weather_wind_max_kt",
+    "weather_precip_mm"
+  ],
+  "weather_available": true,
+  "split_integrity": {
+    "train_voyages": 268,
+    "test_voyages": 79,
+    "voyage_overlap": 0,
+    "test_dates": [
+      "2026-08-26",
+      "2026-08-27",
+      "2026-08-31"
+    ]
+  },
+  "target_stats": {
+    "count": 347.0,
+    "mean": 4.78,
+    "std": 4.46,
+    "min": 0.0,
+    "25%": 2.0,
+    "50%": 4.0,
+    "75%": 5.0,
+    "max": 35.0
+  },
+  "per_port": [
+    {
+      "port": "VISAKHAPATNAM",
+      "voyages": 111,
+      "median_days": 4.0
+    },
+    {
+      "port": "KRISHNAPATNAM",
+      "voyages": 64,
+      "median_days": 4.0
+    },
+    {
+      "port": "HALDIA",
+      "voyages": 37,
+      "median_days": 3.0
+    },
+    {
+      "port": "DHAMRA",
+      "voyages": 35,
+      "median_days": 7.0
+    },
+    {
+      "port": "GANGAVARAM",
+      "voyages": 33,
+      "median_days": 3.0
+    },
+    {
+      "port": "ENNORE",
+      "voyages": 33,
+      "median_days": 3.0
+    },
+    {
+      "port": "CHENNAI",
+      "voyages": 19,
+      "median_days": 2.0
+    },
+    {
+      "port": "KARAIKAL",
+      "voyages": 8,
+      "median_days": 3.5
+    },
+    {
+      "port": "GOPALPUR",
+      "voyages": 5,
+      "median_days": 4.0
+    },
+    {
+      "port": "KATTUPALLI",
+      "voyages": 2,
+      "median_days": 4.0
+    }
+  ],
+  "provenance_tier": "observed",
+  "known_limitations": [
+    "The target is the port's ESTIMATE of port stay. No actual completion time exists in the source data, so realised turnaround cannot be modelled at all.",
+    "Because the target is the port's own schedule, a good score partly reflects the port's queue-management behaviour rather than independent information.",
+    "111 of 347 voyages (32%) are one port, so the effective sample is far smaller than the row count suggests.",
+    "12 snapshot dates in August 2026. A 3-date holdout is a handful of voyages and cannot support a performance claim.",
+    "berths_total is inferred from distinct berth names in the line-up; ports whose report omits berth names have no occupancy figure and it is imputed."
+  ]
+}
