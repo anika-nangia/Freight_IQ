@@ -167,47 +167,176 @@ def fact_sentence(f: Dict[str, Any]) -> Dict[str, str]:
 # --------------------------------------------------------------------------
 # deterministic narrative - always available, never invents anything
 # --------------------------------------------------------------------------
+def _money(v: Any, dp: int = 0) -> str:
+    """Format a dollar figure with separators, or return an empty string."""
+    n = _num(v)
+    if n is None:
+        return ""
+    return f"{n:,.{dp}f}"
+
+
+def _money_short(v: Any) -> str:
+    """Whole dollars under a million, otherwise millions to two decimals.
+
+    "$0.99 million" is both clumsy and arguably misleading, because a reader
+    compares it against the full figures elsewhere on the page.
+    """
+    n = _num(v)
+    if n is None:
+        return ""
+    if abs(n) < 1_000_000:
+        return f"${n:,.0f}"
+    return f"${n / 1_000_000:,.2f} million"
+
+
+# The risk service reports which inputs were absent using internal model labels.
+# A chartering reader does not know what "Model 1" refers to.
+_MISSING_PLAIN = [
+    (re.compile(r"congestion\s*\(Model\s*1\)\s*for this port", re.I),
+     "the berth line-up for this port"),
+    (re.compile(r"freight forecast\s*\(Model\s*2\)\s*for this corridor", re.I),
+     "a rate forecast for this lane"),
+    (re.compile(r"weather\s*\(no observation for this port\)", re.I),
+     "a weather observation for this port"),
+    (re.compile(r"weather.*", re.I), "a weather observation for this port"),
+    (re.compile(r"congestion.*", re.I), "the berth line-up for this port"),
+    (re.compile(r"freight forecast.*", re.I), "a rate forecast for this lane"),
+]
+
+
+def _plain_missing(items: List[str]) -> List[str]:
+    out: List[str] = []
+    for it in items:
+        s = str(it)
+        for rx, plain in _MISSING_PLAIN:
+            if rx.search(s):
+                s = plain
+                break
+        if s not in out:
+            out.append(s)
+    return out
+
+
+def _plain_num(v: Any, dp: int = 2) -> str:
+    n = _num(v)
+    return "" if n is None else f"{n:,.{dp}f}"
+
+
+def _count_word(n: float) -> str:
+    """'no ships waiting' reads better than '0.0 vessels waiting'."""
+    if abs(n) < 0.05:
+        return "no ships waiting"
+    return f"{n:.0f} ship{'s' if abs(n - 1) > 0.05 else ''} waiting"
+
+
+def _horizon_phrase(days: Any) -> str:
+    n = _num(days)
+    if n is None:
+        return "shortly"
+    if n <= 10:
+        return f"in {n:.0f} days"
+    if n <= 20:
+        return "in a fortnight"
+    if n <= 45:
+        return f"in about {n / 7:.0f} weeks"
+    return f"in about {n / 30:.0f} months"
+
+
+def _band_phrase(f: Dict[str, Any]) -> str:
+    lo, hi = _num(f.get("rate_lower_usd_per_tonne")), _num(f.get("rate_upper_usd_per_tonne"))
+    if lo is None or hi is None:
+        return ""
+    return f"anywhere from {_plain_num(lo)} to {_plain_num(hi)}"
+
+
 def deterministic_narrative(f: Dict[str, Any]) -> str:
+    """Plain-English rationale, built only from the facts in `f`.
+
+    The numbers are unchanged from what the models returned - this only decides how
+    they are worded. The previous wording was written for a reader who already knew
+    the methodology: it named the models, said "80% band" twice in one sentence, and
+    printed a raw figure like 2756065 with no thousands separator. A chartering
+    reader needs the number and the caveat, not the labels.
+    """
     parts: List[str] = []
     action = f.get("risk_action") or "HOLD / MONITOR"
     parts.append(f"Recommendation: {action}.")
 
-    if f.get("rate_observed_usd_per_tonne") is not None:
-        move = f.get("rate_change_pct")
-        move_txt = f" ({move:+.1f}%)" if move is not None else ""
-        parts.append(
-            f"Model 2 puts the {f['corridor']} rate at "
-            f"{f['rate_observed_usd_per_tonne']} USD/tonne now and "
-            f"{f['rate_forecast_usd_per_tonne']} USD/tonne in "
-            f"{f.get('rate_horizon_days')} days{move_txt}, with an 80% band of "
-            f"{f['rate_lower_usd_per_tonne']} to {f['rate_upper_usd_per_tonne']} USD/tonne.")
+    lane = f.get("corridor") or "this lane"
+    spot = _num(f.get("rate_observed_usd_per_tonne"))
+    fwd = _num(f.get("rate_forecast_usd_per_tonne"))
+
+    if spot is not None and fwd is not None:
+        band = _band_phrase(f)
+        lo = _num(f.get("rate_lower_usd_per_tonne"))
+        hi = _num(f.get("rate_upper_usd_per_tonne"))
+        outside = (hi is not None and fwd > hi) or (lo is not None and fwd < lo)
+        move = _num(f.get("rate_change_pct"))
+        if move is None:
+            parts.append(
+                f"Rates on {lane} are ${_plain_num(spot)} a tonne today. We expect "
+                f"${_plain_num(fwd)} {_horizon_phrase(f.get('rate_horizon_days'))}.")
+        else:
+            verb = "up" if move > 0 else ("down" if move < 0 else "flat")
+            tail = f", {verb} {abs(move):.1f}%" if abs(move) >= 0.05 else ""
+            parts.append(
+                f"Rates on {lane} are ${_plain_num(spot)} a tonne today. We expect "
+                f"${_plain_num(fwd)} {_horizon_phrase(f.get('rate_horizon_days'))}{tail}.")
+            if band and not outside:
+                parts.append(f"In practice it could land {band} a tonne, so treat that as "
+                             f"a direction rather than a price to lock in.")
+            elif band and outside:
+                # The point estimate sits outside the interval built from the model's
+                # own residuals. Printing both without comment reads as a contradiction,
+                # so say so rather than let a reader trip over it.
+                side = "above" if hi is not None and fwd > hi else "below"
+                parts.append(
+                    f"Be careful with that figure: it sits {side} the "
+                    f"{_plain_num(lo)} to {_plain_num(hi)} range our own error bars allow "
+                    f"for, so the size of the move is not reliable even though the "
+                    f"direction is.")
     else:
-        parts.append(
-            f"No rate forecast is available for this corridor"
-            + (f" ({f['rate_unavailable_reason']})." if f.get("rate_unavailable_reason") else "."))
+        reason = f.get("rate_unavailable_reason")
+        parts.append("We have no rate forecast for this lane"
+                     + (f" ({reason})." if reason else "."))
 
-    if f.get("congestion_category"):
-        parts.append(
-            f"Model 1 reports {f['congestion_category'].lower()} congestion at "
-            f"{f.get('queue_waiting_vessels')} vessels waiting, with a modelled port stay "
-            f"of up to {f.get('port_stay_p80_days')} days at the 80% band.")
+    cat = f.get("congestion_category")
+    q = _num(f.get("queue_waiting_vessels"))
+    stay = _num(f.get("port_stay_p80_days"))
+    if cat:
+        berth = _count_word(q if q is not None else 0.0)
+        if stay is not None:
+            parts.append(
+                f"The berth at the discharge port is {str(cat).lower()}, with {berth}, "
+                f"and a ship should berth and sail inside about {stay:.0f} days.")
+        else:
+            parts.append(f"The berth at the discharge port is {str(cat).lower()}, with {berth}.")
+    elif cat is None and f.get("risk_missing"):
+        parts.append("We have no line-up reading for the discharge port on this query.")
 
-    if f.get("vessel_recommended"):
-        s = f"On vessel choice, {f['vessel_recommended']} is the fit for this parcel."
-        if f.get("vessel_margin_usd") is not None:
-            s += (f" That class is expected to return {f['vessel_margin_usd']:.0f} USD per "
-                  f"voyage over {f.get('cargo_tonnes'):,.0f} tonnes.")
+    vessel = f.get("vessel_recommended")
+    if vessel:
+        margin = _num(f.get("vessel_margin_usd"))
+        tonnes = _num(f.get("cargo_tonnes"))
+        s = f"A {vessel} is the right size for this cargo"
+        if margin is not None:
+            cargo_txt = f" on a {tonnes:,.0f} tonne parcel" if tonnes else ""
+            s += f", and should put about {_money_short(margin)} back{cargo_txt}."
+        else:
+            s += "."
         parts.append(s)
+        if f.get("vessel_origin_verified") is False:
+            parts.append("Check the loading port can actually accept her before fixing.")
 
     if f.get("idle_deadhead_risk"):
         parts.append(
-            f"Return-cargo prospects at the discharge port score {f['idle_deadhead_risk']} "
-            f"risk on the observed export/import balance.")
+            f"Return cargo at the discharge port scores {f['idle_deadhead_risk']} risk "
+            f"on the observed import/export balance.")
 
     if f.get("risk_avoid_adding"):
-        parts.append("Do not commit additional tonnage at this port until this clears.")
+        parts.append("Do not send another ship to this port until this clears.")
     if f.get("risk_missing"):
-        parts.append("Not available for this query: " + "; ".join(f["risk_missing"]) + ".")
+        parts.append("Decided without " + "; ".join(_plain_missing(f["risk_missing"])) + ".")
 
     return " ".join(parts)
 
@@ -224,10 +353,20 @@ def _allowed_numbers(f: Dict[str, Any]) -> set:
     allowed = set()
     for v in f.values():
         if isinstance(v, (int, float)) and not isinstance(v, bool):
-            allowed.add(f"{float(v):g}")
-            allowed.add(f"{float(v):.1f}")
-            allowed.add(f"{float(v):.2f}")
-            allowed.add(f"{float(v):.0f}")
+            x = float(v)
+            allowed.add(f"{x:g}")
+            allowed.add(f"{x:.1f}")
+            allowed.add(f"{x:.2f}")
+            allowed.add(f"{x:.0f}")
+            # Large money figures are also written in millions in the deterministic
+            # text. That is the same value restated, not new information, so it must
+            # not be treated as an invented figure - otherwise an LLM faithfully
+            # copying the supplied phrasing gets its draft thrown away.
+            if abs(x) >= 1_000_000:
+                m = x / 1_000_000
+                allowed.add(f"{m:g}")
+                allowed.add(f"{m:.1f}")
+                allowed.add(f"{m:.2f}")
     for s in fact_sentence(f).values():
         allowed.update(re.findall(r"-?\d+(?:\.\d+)?", s))
     return allowed
@@ -243,6 +382,10 @@ def _numbers_in(text: str) -> set:
     """
     cleaned = re.sub(r"\bModel\s+\d+\b", "Model", text, flags=re.IGNORECASE)
     cleaned = re.sub(r"\b(?:Model|MODEL)\s*[A-Z]?\d*\b", "Model", cleaned)
+    # Thousands separators are presentation, not a different value. Without this,
+    # "$991,665" is read as the two tokens 991 and 665, neither of which is in the
+    # allowed set, and a correctly written LLM draft would be thrown away.
+    cleaned = re.sub(r"(?<=\d),(?=\d{3}\b)", "", cleaned)
     return set(re.findall(r"-?\d+(?:\.\d+)?", cleaned))
 
 
