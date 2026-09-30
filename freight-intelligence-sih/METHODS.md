@@ -13,13 +13,34 @@ of this report at `GET /api/model-report` and the data-coverage panel at
 
 | Model | Target | Validation | Result |
 |---|---|---|---|
-| Model 2, freight rate | log rate at t+2 weeks | walk-forward refit weekly, 8 unseen weeks, 88 rows | XGBoost, **18.8% lower asymmetric regret than persistence** |
-| Model 1, congestion | turnaround days (ETCD − arrival) | last 3 snapshot dates held out, 381 rows | Gradient boosting, **ties the port-median baseline (−0.6% MAE, +4.0% RMSE)** |
+| Model 2, freight rate | log rate at t+2 weeks | walk-forward refit weekly, 8 unseen weeks, 88 rows | XGBoost, **+17.5% to +19.8% regret vs persistence** (range over 4 seeds), CI excludes zero |
+| Model 1, congestion | **port's estimate** of port stay | 3 held-out dates, 79 voyages, voyage-disjoint | **A per-port median wins. No fitted model beat it.** All R² negative |
 
-Model 1 is reported as a tie on purpose. A 0.6% MAE difference on three held-out dates
-is inside noise, and the model card says so rather than quoting the flattering R².
+Two results are negative and are reported as such:
+
+- **Model 1 has no demonstrated modelling value.** Once the leakage was removed, every
+  fitted candidate is worse than knowing a port's usual figure.
+- **No feature group in Model 2 is statistically separable from zero**, including
+  momentum. The only finding that survives a noise floor is that a fitted model beats
+  persistence.
 
 ---
+
+## 1a. Corrections to the previous version of this report
+
+An earlier draft of this document claimed the deployed Model 2 used momentum features
+only, and that weather and commodity features were shown not to help. **That claim has
+been withdrawn.** It rested on a regret difference of about 0.002 with a zero-tolerance
+rule (`helps = reg > base`), and the verdict flipped between machines. With a paired
+bootstrap noise floor, no feature group's contribution is separable from zero on 8
+out-of-sample weeks. The deployed model now uses the full feature set and the report
+makes no per-feature claim.
+
+The headline number was also quoted as a point. It is a range, because XGBoost's regret
+moves between 0.2213 and 0.2276 across seeds.
+
+---
+
 
 ## 2. Data, and how much of it is real
 
@@ -103,26 +124,38 @@ weeks, 88 rows.
 | Ridge | 0.2511 | 4.50 | 6.90 | 83% |
 | **XGBoost (deployed)** | **0.2245** | **3.13** | **4.70** | **86%** |
 
-### The ablation is the important result
+### The ablation, and what it does and does not show
 
-Feature importance said weather was the strongest driver. The ablation disagreed:
+Feature importance ranked weather as the strongest driver. Importance is not
+contribution, so each group is refit without it and the difference tested.
 
-| Group | Regret without it | Verdict |
-|---|---|---|
-| Momentum | 0.2465 | **helps** |
-| Weather | 0.2230 | no measurable benefit |
-| Commodity | 0.2221 | no measurable benefit |
-| Baltic | — | not testable, no data |
-| Level | 0.2222 | no measurable benefit |
+| Group | Regret without it | 95% CI on the difference | Verdict |
+|---|---|---|---|
+| Momentum | 0.2465 | [−0.1364, +0.0001] | no reliable effect |
+| Weather | 0.2230 | [−0.0092, +0.0054] | no reliable effect |
+| Commodity | 0.2221 | [−0.0103, +0.0073] | no reliable effect |
+| Baltic | — | — | not testable, no data |
+| Level | 0.2222 | [−0.0264, +0.0138] | no reliable effect |
 
-Removing weather made regret *marginally better*. Over a five-month window rainfall is
-largely a proxy for the monsoon, and a tree will use it to identify the period rather
-than to explain a rate. **The deployed model therefore uses momentum features only.**
-Presenting the full model would have meant telling a reviewer that rain drives freight
-rates, which the data does not support.
+**No group, including momentum, is separable from zero.** The previous version of this
+analysis used a zero-tolerance rule and concluded "momentum only"; that conclusion is
+withdrawn. Bootstrap resamples **weeks**, not rows, because the 11 lanes in a week share
+a market and their errors are not independent.
 
-This is a real result, not a caveat. The lane history is the signal; the market data we
-attached does not add to it at this sample size.
+The deployed model therefore uses the full feature set, and no per-feature claim is made.
+On 8 out-of-sample weeks, *which* features produce the result is not established.
+
+### Headline, quoted as a range
+
+Paired bootstrap over the 8 out-of-sample weeks: regret improvement of XGBoost over
+persistence **+0.0716, 95% CI [+0.0173, +0.1453]**. The interval excludes zero, so this
+difference is real.
+
+Across four seeds XGBoost's regret ranges 0.2213–0.2276, giving a reduction of
+**+17.5% to +19.8%**. Quote the range, not the point. The ranking (XGBoost ahead of
+ARIMA, Ridge and persistence) is stable across seeds and environments; the margin is
+modest.
+
 
 ### Regime check
 
@@ -144,40 +177,86 @@ protect the asymmetric penalty. Offsets increase with coverage, asserted in test
 
 ---
 
-## 5. Model 1: port congestion and turnaround
+## 5. Model 1: port congestion
 
-**Target** `turnaround_days = ETCD − arrival`, observed per vessel. 1,608 real
-observations, 11 ports, 12 August 2026 snapshot dates.
+### The target is an estimate, not an outcome
 
-| Candidate | MAE (days) | RMSE (days) | R² |
-|---|---|---|---|
-| Port-median baseline | 2.31 | 3.95 | −0.031 |
-| **Gradient boosting (deployed)** | 2.33 | **3.79** | **0.050** |
-| Random forest | 2.61 | 3.87 | 0.010 |
+`estimated_port_stay_days` = `etc_or_etcd − arrival_or_eta`, read at the first snapshot
+where a vessel is recorded as Working.
 
-**This is a tie.** The previous implementation returned a hardcoded `r2: 0.884` from a
-function that read no data at all. The honest reading: on three held-out dates the model
-shows no demonstrated gain over knowing a port's normal turnaround. It is deployed
-because it also uses queue and occupancy, which a static median ignores, and it degrades
-sensibly on an unseen port. Predictions are reported as ranges from measured residual
-quantiles, not as bare points.
+**The source data contains no actual completion, departure or sailing field.** The only
+status values are Expected / Waiting / Waiting & Expected / Working, so no voyage is
+ever recorded as finished. A true turnaround needs an actual arrival and an actual
+departure, and this dataset has neither. The quantity is therefore the **port's own
+published schedule**, and a model fitted to it predicts what the port says.
+
+That weakens the previous "beats the port median" framing in a specific way: beating a
+per-port median of the port's own schedule is a much lower bar than beating real
+turnaround, and it is not met either.
+
+### Three defects in the previous build
+
+1. **The target was mislabelled** as a realised turnaround. Corrected, and the rename is
+   asserted in the tests.
+2. **Pseudo-replication.** The same voyage appeared on every snapshot it was listed on,
+   so 1,608 rows were really 692 voyages. A vessel whose ETCD slid from 25 to 26 August
+   was counted as a second, independent observation. Now: exactly one row per voyage.
+3. **Contaminated target.** 41% of those rows were for vessels that had not yet
+   arrived, so `arrival_or_eta` was an ETA and the "turnaround" was a forecast of a
+   forecast. Now restricted to voyages already berthed.
+
+Additionally, **the split leaked**: holding out dates still left **80% of held-out rows
+(304 of 381) sharing a voyage with the training set**, because a voyage listed on both
+25 and 26 August straddled the boundary. Holding out voyages as well as dates gives
+268 train / 79 test with **zero overlap**, asserted in the builder and the tests.
+
+### Results
+
+| Candidate | MAE (days) | 95% CI | RMSE | R² |
+|---|---|---|---|---|
+| **Port-median baseline (deployed)** | **2.639** | [1.98, 3.39] | 4.183 | −0.092 |
+| Global-median baseline | 2.722 | [2.08, 3.43] | 4.138 | −0.069 |
+| Gradient boosting | 2.757 | [2.09, 3.47] | 4.257 | −0.131 |
+| Random forest | 2.993 | [2.40, 3.63] | 4.143 | −0.071 |
+
+Paired bootstrap, gradient boosting minus port median: **−0.118 days, 95% CI
+[−0.378, +0.137]**. The interval spans zero, so the two are equivalent.
+
+**Every R² is negative**, meaning each candidate is worse than simply predicting the
+held-out mean. The deployed artifact is therefore the per-port median, because that is
+what the data supports. Shipping the gradient boosting model would add noise and a false
+impression of skill.
+
+The previous implementation returned a hardcoded `r2: 0.884` from a function that read
+no data at all.
+
+### Sampling concentration
+
+Visakhapatnam supplies 111 of 347 voyages (32%). The effective sample is well below 347,
+which is why every confidence interval above is wide.
+
 
 ---
 
 ## 6. What was removed, and why
 
-| Removed | Reason |
+| Removed / corrected | Reason |
 |---|---|
 | `predict_freight.py` `BASE_RATES` | Invented rates: `australia-paradip: 15.10`, with `18.20` returned for any unknown corridor |
 | Hand-written "SHAP breakdown" | Multiplication of hand-picked coefficients, not model output. Replaced with leave-one-out contributions from the fitted booster |
 | `train_congestion.py` metrics | Hardcoded `r2: 0.884`, `n_samples: 450` from a function that fitted nothing |
+| **`turnaround_days` label** | ETCD is the port's forward estimate. No completion field exists in the data. Renamed `estimated_port_stay_days` and flagged everywhere |
+| **Model 1's 1,608 rows** | Really 692 voyages, each counted once per snapshot listing. Now one row per voyage |
+| **Model 1's date-only split** | 80% of held-out rows shared a voyage with training. Now voyage-disjoint, asserted |
+| **`helps = reg > base`** | Zero tolerance on a 0.002 difference; verdict flipped between machines. Replaced with a paired bootstrap over weeks, tri-state verdict |
+| **Single-seed headline** | Moved 18.8%→20.2% between environments. Now a range across four seeds plus a significance test |
+| **Windows path in artifact** | `models\artifacts\...` is not portable. Now POSIX separators, asserted |
 | `fx_market_api.py` | Returned `bdi: 1842`, `usd_inr: 83.42` as constants. BDI has no free source and is now marked unavailable; FX comes from ECB |
 | Both Firecrawl scrapers | Simulated. The berth scraper fed invented queues into congestion scoring |
 | Both PDF parsers | Returned hardcoded dictionaries. The ISS parser supplied fabricated MMT traffic figures that drove deadhead risk |
-| `iss_report_parser` traffic figures | Fed invented inbound/outbound ratios into the idle analysis |
-| Repositioning opportunity list | Claimed specific profit figures (e.g. "net profit gain 41,200 USD" ballasting Haldia to Dhamra) present in no source file and not derivable from the line-ups |
+| Repositioning opportunity list | Claimed specific profit figures (e.g. "net profit gain 41,200 USD" ballasting Haldia to Dhamra) present in no source file |
 | News disruption feed | Three hardcoded items with fixed dates, so risk tier never changed |
-| `distance_km: 2147 if ... else 3850` in `main.py` | Hardcoded. Now computed from port coordinates, and flagged as assumed when either endpoint lacks them |
+| `distance_km: 2147 if ... else 3850` in `main.py` | Hardcoded. Now computed from port coordinates, flagged as assumed when an endpoint lacks them |
 | `train_model()` per API request | Retrained on every call. Metrics now load from files; asserted by a test |
 | Four modules importing a non-existent `app` package | Could not run at all |
 
@@ -217,6 +296,17 @@ producing a p50 band wider than p90. Corrected, with monotonicity asserted.
 `sign(0)` against a real move always missed, making the strongest baseline look
 directionally useless. Persistence now reports `null` for direction.
 
+**Seeds that never reached the model.** The seed sweep reported an identical regret for
+all four seeds. `seed: int = RANDOM_SEED` as a default argument captures the value at
+definition time, so reassigning the module global did nothing. Seed is now threaded
+explicitly, and a test asserts the sweep produces a non-zero spread.
+
+**A bootstrap comparing two identical models.** The ablation's noise floor initially
+built *both* candidates from the reduced feature set, so every difference was exactly
+zero and "no effect" was the right answer for the wrong reason. The two feature sets are
+now passed separately, and comparing a candidate with itself returns an explicit error
+rather than a spurious null.
+
 ---
 
 ## 8. Known limits
@@ -226,14 +316,14 @@ directionally useless. Persistence now reports `null` for direction.
    clusters (China and the Black Sea), 1 discharge region pair. There is no US,
    Australia, Indonesia, Mozambique or Handysize rate history, so the API returns
    "no rate history" for those lanes rather than a proxy number.
-3. **6 monthly points per corridor.** No monthly model is fitted, because it could not
-   be validated. The 1–6 month contract path is an extrapolation of the validated
-   weekly model, labelled `derived_path`, with the interval scaled by √horizon.
-4. **12 snapshot dates in one month.** Model 1's evaluation is 3 held-out dates. It is a
-   direction check, not a performance claim.
-5. **Model 1 does not beat its baseline.** Stated above rather than buried.
-6. **Weather is confounded with the monsoon** over this window, and the ablation shows
-   it adds nothing. It is excluded from the deployed model.
+3. **8 out-of-sample weeks.** Everything in Model 2 rests on this. It is enough to
+   establish that a fitted model beats persistence, and not enough to attribute that to
+   any feature group.
+4. **Model 1's target is the port's estimate, not reality.** No completion field exists
+   in the data. If actual port stay matters, the dataset needs one.
+5. **Model 1 has no modelling value.** A per-port median wins; all R² are negative.
+6. **12 snapshot dates in one month**, concentrated in a few ports. Model 1's intervals
+   are wide for that reason.
 7. **Port dues are a placeholder.** No tariff data is held. It changes the cost ranking
    between similar classes. It does not affect feasibility, which depends only on
    physical limits.
@@ -242,7 +332,11 @@ directionally useless. Persistence now reports `null` for direction.
 9. **Demurrage, hotel bunkers, and speed are business assumptions**, returned in the
    API response so a caller can substitute their own.
 10. **Rows within a week are correlated**, so the effective sample size is weeks, not
-    rows.
+    rows. This is why both bootstraps resample weeks.
+11. **Library versions are pinned** for a reason: the congestion artifact is a pickled
+    sklearn estimator and is version-coupled. A rebuild on a different sklearn or
+    XGBoost version moves the headline, so the seed range in the model card is what to
+    compare against.
 
 ---
 
@@ -251,14 +345,19 @@ directionally useless. Persistence now reports `null` for direction.
 Ranked by expected gain per unit of effort.
 
 1. **Confirm the rate source.** Everything in Model 2 rests on it.
-2. **Add route rates for the missing lanes.** US, Australia, Indonesia, Mozambique and
+2. **Add an actual completion / departure field** to the line-up data. Without one,
+   Model 1 can only ever predict the port's own schedule, and no amount of modelling
+   will change that.
+3. **Add route rates for the missing lanes.** US, Australia, Indonesia, Mozambique and
    Handysize currently return "no rate history". This is the binding constraint on
    coverage, not on accuracy.
-3. **Supply the Baltic CSV.** BCI, BPI, BSI and BHSI are the natural class-level
-   features, and Junaid's own audit found BDI did *not* help his ARIMA, so measure it
-   rather than assume it.
-4. **Extend the line-up history past August 2026.** Model 1 needs more dates before its
-   evaluation means anything.
-5. **Get terminal-level rate data.** Rates are currently port-pair level, so no
+4. **Get more line-up months.** 12 dates concentrated in one port cannot support Model
+   1's evaluation. More months would let the fitted models be tested properly, and might
+   make the fitted model beat the median.
+5. **Supply the Baltic CSV.** BCI, BPI, BSI and BHSI are the natural class-level
+   features. Junaid's own audit found BDI did *not* help his ARIMA, so measure rather
+   than assume — and note that on this panel the ablation could not establish an effect
+   for any external feature group, so BDI is unlikely to be the lever it appears to be.
+6. **Get terminal-level rate data.** Rates are currently port-pair level, so no
    terminal-level differences are invented.
-6. **Add port tariffs** to replace the dues placeholder in the cost ranking.
+7. **Add port tariffs** to replace the dues placeholder in the cost ranking.

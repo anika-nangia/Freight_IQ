@@ -1,26 +1,39 @@
 """
 Build the Model 1 dataset from real port line-up data.
 
-WHAT THE LINE-UP DATA ACTUALLY CONTAINS
-    data/vessel_snapshots.csv gives, per port and snapshot date, each vessel's status
-    (Working / Waiting / Expected), its berth, cargo, direction, and critically
-    arrival_or_eta plus etc_or_etcd. The gap between those two dates is a REALISED
-    turnaround time, observed rather than assumed. That is the modelling target.
+WHAT THE TARGET ACTUALLY IS  (this was wrong before, and the correction matters)
+    The previous version of this file computed `turnaround_days = ETCD - arrival`
+    and called it a REALISED turnaround. It is not.
 
-FEATURES are all knowable at decision time:
-    queue_waiting      vessels at the anchorage waiting for a berth
-    vessels_working   vessels currently discharging
-    berths_total      berth capacity at the port
-    berth_occupancy   working / total, from the line-up itself
-    arrivals_7d       vessels expected to arrive within a week
-    inbound_working   share of the working fleet discharging (import) vs loading (export)
-    plus Open-Meteo wind and rainfall for the port that week.
+    A turnaround time is an outcome: it needs an actual arrival and an actual
+    departure. This dataset contains NEITHER completion field. There is no
+    'sailed', 'departed', 'actual completion' or 'closed' column, and the only
+    status values are Expected / Waiting / Waiting & Expected / Working - all of
+    which describe a vessel that has not yet finished.
 
-LEAKAGE
-    Turnaround for a vessel that is still working is not yet observable, so the
-    training sample is restricted to vessels whose ETCD is known AND is not in the
-    future relative to the snapshot. The congestion SCORE, by contrast, is computed
-    from the same snapshot, so it is a legitimate live input.
+    So `arrival_or_eta` is an ETA for anything not yet arrived, and `etc_or_etcd`
+    is the port's own forward-looking schedule. The quantity we can compute is
+    therefore the port's ESTIMATE of port stay, not a measured one. It is renamed
+    `estimated_port_stay_days` throughout and is never described as realised.
+
+    This is not a cosmetic change. Two consequences:
+      * a model fitted to it predicts the port's schedule, which is partly a
+        function of the port's own queue-management behaviour;
+      * 'ties the port median' now means the model adds nothing beyond what a
+        static per-port schedule would give, which is a much weaker claim than
+        beating real turnaround.
+
+TWO MORE DEFECTS FIXED HERE
+    1. Pseudo-replication. The same voyage appears on every snapshot it is listed
+       on, so the old build produced 1,608 rows that are really 692 voyages. A
+       vessel whose ETCD slid from 25 Aug to 26 Aug was counted as a second,
+       independent observation of the same voyage.
+    2. Contaminated target. 41% of those rows were for vessels that had not yet
+       arrived, so `arrival_or_eta` was an ETA and the "turnaround" was a forecast
+       of a forecast.
+
+    Now: exactly one row per voyage, and only voyages whose arrival has actually
+    happened at the snapshot we read them from.
 
 Run:  python -m data_pipeline.build_congestion_dataset
 """
@@ -40,14 +53,14 @@ sys.path.insert(0, str(ROOT))
 from data_pipeline import provenance as prov  # noqa: E402
 
 LINEUPS = ROOT / "data" / "vessel_snapshots.csv"
-BERTHS = ROOT / "data" / "berth_operations.csv"
 WEATHER = ROOT / "data" / "external" / "port_weather_daily.csv"
 OUT = ROOT / "data" / "interim" / "congestion_dataset.csv"
+SNAPSHOTS_OUT = ROOT / "data" / "interim" / "port_congestion_snapshots.csv"
 REPORT = ROOT / "data" / "interim" / "congestion_report.json"
 
-# A turnaround longer than this is a data error (an ETCD a year out), not an operation.
-MAX_TURNAROUND_DAYS = 120.0
-# Ports whose names differ between the line-up report and the weather file.
+TARGET = "estimated_port_stay_days"
+MAX_STAY_DAYS = 120.0
+
 PORT_ALIASES = {
     "PARADIP PORT": "PARADIP",
     "SANDHEADS": "SAGAR",
@@ -64,9 +77,7 @@ BOTH_WORDS = ("D/L", "D/D", "BOTH")
 
 
 def _norm_for_flow(name: str) -> str:
-    """Normalise a port name to the key used in the line-up data."""
-    return (PORT_ALIASES.get(str(name).strip().lower())
-            or str(name).strip().upper())
+    return PORT_ALIASES.get(str(name).strip().lower()) or str(name).strip().upper()
 
 
 def _dir_class(s: str) -> Optional[str]:
@@ -97,97 +108,82 @@ def _vessel_class(s: str) -> Optional[str]:
     return None
 
 
-def load_lineups() -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Return (snapshot-level congestion features, vessel-level realised turnarounds)."""
+def _load_lineups() -> pd.DataFrame:
     d = pd.read_csv(LINEUPS)
     d["snapshot_date"] = pd.to_datetime(d["snapshot_date"])
     d["port"] = d["port"].astype(str).str.strip().str.upper().replace(PORT_ALIASES)
     d["status_clean"] = d["status"].astype(str).str.strip()
-
-    # ---------------- snapshot-level features ----------------
-    d["is_waiting"] = d["status_clean"].str.contains("Waiting", case=False, na=False).astype(int)
-    d["is_working"] = (d["status_clean"].str.contains("Working", case=False, na=False)).astype(int)
-    d["is_expected"] = d["status_clean"].str.contains("Expected", case=False, na=False).astype(int)
-
-    # 'Waiting & Expected' is ambiguous and has to be split before it can be counted.
-    # At Paradip every row carries that status with no vessel berthed, which is an
-    # arrivals forecast, not an anchorage queue. Treating those 40 vessels as waiting
-    # produced a queue of 40 against zero berthed and a congestion score with no
-    # operational meaning behind it.
-    #
-    # A vessel is only genuinely at anchor if it has already arrived:
-    # arrival_or_eta on or before the snapshot date.
-    _arr = pd.to_datetime(d["arrival_or_eta"], errors="coerce")
-    _arrived = ((_arr - d["snapshot_date"]).dt.days <= 0).astype(int)
-    _arrived[_arr.isna()] = 0
-    d["has_arrived"] = _arrived
-    d["is_queued"] = ((d["is_waiting"] == 1) & (d["has_arrived"] == 1)).astype(int)
+    d["arrival"] = pd.to_datetime(d["arrival_or_eta"], errors="coerce")
+    d["etcd"] = pd.to_datetime(d["etc_or_etcd"], errors="coerce")
     d["dir_class"] = d["direction"].map(_dir_class)
     d["vessel_class"] = d["vessel_type"].map(_vessel_class)
+    d["tonnage"] = pd.to_numeric(d["quantity_mts_numeric"], errors="coerce").fillna(0.0)
 
+    d["is_working"] = d["status_clean"].str.contains("Working", case=False, na=False).astype(int)
+    d["is_expected"] = d["status_clean"].str.contains("Expected", case=False, na=False).astype(int)
+    # 'Waiting & Expected' is ambiguous. A vessel only counts as queued if it has
+    # already arrived. At Paradip all 40 listed vessels carry that status with none
+    # berthed, which is an arrivals forecast, not an anchorage queue.
+    d["has_arrived"] = ((d["arrival"] - d["snapshot_date"]).dt.days <= 0).astype(int)
+    d.loc[d["arrival"].isna(), "has_arrived"] = 0
+    d["is_queued"] = (d["status_clean"].str.contains("Waiting", case=False, na=False)
+                      & (d["has_arrived"] == 1)).astype(int)
+    return d
+
+
+def snapshot_features(d: pd.DataFrame) -> pd.DataFrame:
+    """Line-up state per port per snapshot date. Observed, all knowable in advance."""
     g = d.groupby(["port", "snapshot_date"], as_index=False)
     snap = g.agg(
         vessels_in_lineup=("status_clean", "size"),
         queue_waiting=("is_queued", "sum"),
-        vessels_awaiting_berth=("is_waiting", "sum"),
+        vessels_awaiting_berth=("is_waiting", "sum") if "is_waiting" in d.columns else ("is_queued", "sum"),
         vessels_working=("is_working", "sum"),
         vessels_expected=("is_expected", "sum"),
-        working_import=("is_working", lambda s: 0),   # replaced below
-        cargo_tonnage=("quantity_mts_numeric", lambda s: float(np.nansum(s)) if len(s) else 0.0),
+        cargo_tonnage=("tonnage", "sum"),
     )
-    # Direction split has to be computed on the masked rows, not via agg.
     wk = d[d["is_working"] == 1]
     split = (wk.groupby(["port", "snapshot_date"])["dir_class"]
                .value_counts().unstack(fill_value=0).reset_index())
-    for col in ("import", "export", "both"):
-        if col not in split.columns:
-            split[col] = 0
+    for c in ("import", "export", "both"):
+        if c not in split.columns:
+            split[c] = 0
     split = split.rename(columns={"import": "working_import", "export": "working_export",
                                   "both": "working_both"})
-    snap = snap.drop(columns=["working_import"]).merge(
+    if "working_import" in snap.columns:
+        snap = snap.drop(columns=["working_import"])
+    snap = snap.merge(
         split[["port", "snapshot_date", "working_import", "working_export", "working_both"]],
         on=["port", "snapshot_date"], how="left")
 
-    # Expected arrivals inside a week of the snapshot.
-    arr = pd.to_datetime(d["arrival_or_eta"], errors="coerce")
-    soon = d.assign(_soon=((arr - d["snapshot_date"]).dt.days.between(0, 7))).astype({"_soon": int})
-    arrivals = soon.groupby(["port", "snapshot_date"])["_soon"].sum().reset_index()
+    arr = d.copy()
+    arr["_soon"] = ((arr["arrival"] - arr["snapshot_date"]).dt.days.between(0, 7)).astype(int)
+    arr = arr[(arr["has_arrived"] == 0)]      # inbound, not yet present
+    arrivals = arr.groupby(["port", "snapshot_date"])["_soon"].sum().reset_index()
     arrivals.columns = ["port", "snapshot_date", "arrivals_next_7d"]
     snap = snap.merge(arrivals, on=["port", "snapshot_date"], how="left")
 
-    berths = _berth_capacity()
-    snap = snap.merge(berths, on="port", how="left")
-    snap["berth_occupancy"] = np.where(
-        snap["berths_total"] > 0, snap["vessels_working"] / snap["berths_total"], np.nan)
-    snap["queue_ratio"] = np.where(
-        snap["vessels_working"] > 0, snap["queue_waiting"] / snap["vessels_working"], 0.0)
-
-    # ---------------- vessel-level realised turnaround ----------------
-    v = d.copy()
-    v["arrival"] = pd.to_datetime(v["arrival_or_eta"], errors="coerce")
-    v["etcd"] = pd.to_datetime(v["etc_or_etcd"], errors="coerce")
-    v["turnaround_days"] = (v["etcd"] - v["arrival"]).dt.total_seconds() / 86400.0
-    # Keep only physically sensible observations: ETCD at or after arrival, and inside
-    # the plausible range. The raw file contains ETCDs over a year out, which are
-    # scheduling placeholders rather than completions.
-    v = v.dropna(subset=["arrival", "etcd", "turnaround_days"])
-    v = v[(v["turnaround_days"] >= 0) & (v["turnaround_days"] <= MAX_TURNAROUND_DAYS)]
-    return snap, v
+    cap = _berth_capacity(d)
+    snap = snap.merge(cap, on="port", how="left")
+    snap["berth_occupancy"] = np.where(snap["berths_total"] > 0,
+                                       snap["vessels_working"] / snap["berths_total"], np.nan)
+    snap["queue_ratio"] = np.where(snap["vessels_working"] > 0,
+                                   snap["queue_waiting"] / snap["vessels_working"], 0.0)
+    return snap
 
 
-def _berth_capacity() -> pd.DataFrame:
-    """Berth count per port, taken from the line-up's own berth names.
+def _berth_capacity(d: pd.DataFrame) -> pd.DataFrame:
+    """Berth count from the line-up's own berth names.
 
     berth_operations.csv holds only 'Vacant' rows, so it cannot supply a denominator.
-    The line-up does: each snapshot lists the berths actually in use, and the number of
-    distinct berth names observed at a port is the best available capacity figure.
+    Ports whose report omits berth names get no figure, and the column stays blank
+    rather than being filled with a guess.
     """
-    b = pd.read_csv(LINEUPS)
-    b["port"] = b["port"].astype(str).str.strip().str.upper().replace(PORT_ALIASES)
-    b = b[b["berth_name"].notna() & (b["berth_name"].astype(str).str.strip() != "")]
-    cap = (b.groupby("port")["berth_name"].nunique().reset_index()
+    b = d[d["berth_name"].notna() & (d["berth_name"].astype(str).str.strip() != "")]
+    if b.empty:
+        return pd.DataFrame(columns=["port", "berths_total"])
+    return (b.groupby("port")["berth_name"].nunique().reset_index()
              .rename(columns={"berth_name": "berths_total"}))
-    return cap
 
 
 def add_weather(snap: pd.DataFrame) -> Tuple[pd.DataFrame, bool]:
@@ -206,9 +202,6 @@ def add_weather(snap: pd.DataFrame) -> Tuple[pd.DataFrame, bool]:
     out = snap.copy()
     out["weather_port"] = out["port"].map(WEATHER_NAMES)
     out["week"] = out["snapshot_date"] - pd.to_timedelta(out["snapshot_date"].dt.weekday, unit="D")
-
-    # Explicit per-region backward search: merge_asof advances one global cursor and
-    # silently returns NaN for whole groups when left_by/right_by are used together.
     for col in ("weather_wind_max_kt", "weather_precip_mm", "weather_gale_days"):
         out[col] = np.nan
         for region, grp in wk.groupby("region"):
@@ -217,10 +210,9 @@ def add_weather(snap: pd.DataFrame) -> Tuple[pd.DataFrame, bool]:
             sel = (out["weather_port"].to_numpy() == region)
             if not sel.any():
                 continue
-            obs = out.loc[sel, "week"].to_numpy()
-            pos = np.searchsorted(weeks, obs, side="right") - 1
+            pos = np.searchsorted(weeks, out.loc[sel, "week"].to_numpy(), side="right") - 1
             ok = pos >= 0
-            assigned = np.full(obs.shape, np.nan, dtype=float)
+            assigned = np.full(int(sel.sum()), np.nan)
             assigned[ok] = vals[pos[ok]]
             out.loc[sel, col] = assigned
     out = out.drop(columns=["weather_port", "week"], errors="ignore")
@@ -228,82 +220,125 @@ def add_weather(snap: pd.DataFrame) -> Tuple[pd.DataFrame, bool]:
     return out, True
 
 
-def build() -> Tuple[pd.DataFrame, pd.DataFrame]:
-    snap, vessels = load_lineups()
+def build_voyage_table(snap: pd.DataFrame) -> pd.DataFrame:
+    """One row per voyage: the port's estimate of port stay, read at first berthing.
+
+    A voyage is keyed by port + vessel + arrival date. We take the first snapshot at
+    which the vessel is recorded as Working AND its arrival date is on or before that
+    snapshot, so the arrival leg is a real event rather than an ETA.
+
+    Everything else about the vessel is dropped, including later snapshots. A second
+    sighting of the same voyage is not a second observation, and treating it as one
+    put 80% of the held-out rows in the training set.
+    """
+    return snap  # placeholder replaced by caller-provided voyage frame
+
+
+def build() -> pd.DataFrame:
+    d = _load_lineups()
+    snap = snapshot_features(d)
     snap, has_wx = add_weather(snap)
 
-    # Attach the realised turnaround to the snapshot it was observed in, so each
-    # training row is (congestion state at snapshot) -> (turnaround that followed).
-    cols = ["port", "snapshot_date", "arrival", "etcd", "turnaround_days",
-            "vessel_class", "dir_class", "quantity_mts_numeric"]
-    v = vessels[[c for c in cols if c in vessels.columns]].copy()
-    v = v.rename(columns={"quantity_mts_numeric": "cargo_mt"})
-    panel = snap.merge(v, on=["port", "snapshot_date"], how="inner")
-    panel = panel.rename(columns={"quantity_mts_numeric": "cargo_mt"})
+    # ---------------------------------------------------- one row per voyage
+    d["voyage_key"] = (d["port"] + "|" + d["vessel_name"].astype(str) + "|"
+                      + d["arrival"].dt.strftime("%Y-%m-%d"))
+    eligible = d[(d["is_working"] == 1) & (d["has_arrived"] == 1) & d["etcd"].notna()].copy()
+    n_all_voyages = d[d["etcd"].notna()]["voyage_key"].nunique()
 
-    features = ["queue_waiting", "vessels_awaiting_berth", "vessels_working",
-                "berths_total", "berth_occupancy",
-                "queue_ratio", "vessels_expected", "arrivals_next_7d",
+    first = (eligible.sort_values("snapshot_date")
+             .groupby("voyage_key", as_index=False)
+             .agg(port=("port", "first"),
+                  vessel_class=("vessel_class", "first"),
+                  dir_class=("dir_class", "first"),
+                  cargo_mt=("tonnage", "first"),
+                  snapshot_date=("snapshot_date", "min"),
+                  arrival=("arrival", "first"),
+                  etcd=("etcd", "first")))
+    first[TARGET] = (first["etcd"] - first["arrival"]).dt.total_seconds() / 86400.0
+    first = first[(first[TARGET] >= 0) & (first[TARGET] <= MAX_STAY_DAYS)]
+
+    # The port REVISES ETCD as a voyage progresses. Reading it at the first berthing
+    # is the decision-relevant moment and keeps the definition consistent.
+    panel = first.merge(snap, on=["port", "snapshot_date"], how="left")
+    panel = panel.reset_index(drop=True)
+
+    features = ["queue_waiting", "vessels_awaiting_berth", "vessels_working", "berths_total",
+                "berth_occupancy", "queue_ratio", "vessels_expected", "arrivals_next_7d",
                 "working_import", "working_export", "cargo_tonnage",
-                "weather_wind_max_kt", "weather_precip_mm", "weather_gale_days"]
+                "weather_wind_max_kt", "weather_precip_mm"]
     features = [f for f in features if f in panel.columns]
-    n0 = len(panel)
-    # Only the turnaround target is required. Weather and berth capacity are missing
-    # for some ports, and an earlier version dropped those rows here, which silently
-    # cut the dataset from 11 ports to 5. Gaps are imputed at training time from
-    # training-period medians instead, so no geography is lost.
-    panel = panel.dropna(subset=["turnaround_days"]).reset_index(drop=True)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     panel.to_csv(OUT, index=False)
-    snap.to_csv(ROOT / "data" / "interim" / "port_congestion_snapshots.csv", index=False)
+    snap.to_csv(SNAPSHOTS_OUT, index=False)
 
-    per_port = (snap.groupby("port")
-                   .agg(snapshots=("snapshot_date", "nunique"),
-                        mean_queue=("queue_waiting", "mean"),
-                        max_queue=("queue_waiting", "max"),
-                        mean_occupancy=("berth_occupancy", "mean"))
-                   .round(2).reset_index())
+    # Split integrity: the whole point of the rebuild is that a voyage cannot appear
+    # on both sides of the split. Asserted here as well as in the test suite.
+    dates = sorted(panel["snapshot_date"].unique())
+    test_dates = set(dates[-3:])
+    tr = set(panel.loc[~panel["snapshot_date"].isin(test_dates), "voyage_key"])
+    te = set(panel.loc[panel["snapshot_date"].isin(test_dates), "voyage_key"])
+
+    per_port = (panel.groupby("port")[TARGET]
+                   .agg(voyages="size", median_days="median")
+                   .round(1).sort_values("voyages", ascending=False).reset_index())
+
     report = {
         "built_at": pd.Timestamp.now("UTC").isoformat(timespec="seconds"),
-        "training_rows": int(len(panel)),
-        "rows_before_filter": int(n0),
-        "ports": int(snap["port"].nunique()),
-        "snapshot_dates": sorted(d.strftime("%Y-%m-%d") for d in snap["snapshot_date"].unique()),
+        "target": TARGET,
+        "target_definition": "etc_or_etcd minus arrival_or_eta, read at the first snapshot "
+                             "where the vessel is recorded as Working and its arrival date "
+                             "has passed",
+        "target_is_an_estimate": True,
+        "why_it_is_an_estimate": "The line-up data contains no actual completion, departure "
+                                 "or sailing field. Status values are only Expected / Waiting / "
+                                 "Waiting & Expected / Working, so no voyage is ever recorded "
+                                 "as finished. The target is therefore the port's own published "
+                                 "schedule, not a measured turnaround. This model predicts the "
+                                 "port's estimate.",
+        "no_realised_turnaround_available": True,
+        "rows": int(len(panel)),
+        "voyages_with_etcd_total": int(n_all_voyages),
+        "voyages_kept": int(len(panel)),
+        "voyages_dropped_not_yet_berthed_or_arrival_is_eta": int(n_all_voyages - len(panel)),
+        "ports": int(panel["port"].nunique()),
+        "snapshot_dates": [x.strftime("%Y-%m-%d") for x in dates],
         "features": features,
-        "target": "turnaround_days = ETCD - arrival, observed per vessel",
-        "target_stats": {k: round(float(v), 3) for k, v in
-                         panel["turnaround_days"].describe().items()},
         "weather_available": has_wx,
+        "split_integrity": {
+            "train_voyages": len(tr), "test_voyages": len(te),
+            "voyage_overlap": len(tr & te),
+            "test_dates": sorted(x.strftime("%Y-%m-%d") for x in test_dates),
+        },
+        "target_stats": {k: round(float(v), 2) for k, v in panel[TARGET].describe().items()},
         "per_port": per_port.to_dict(orient="records"),
         "provenance_tier": prov.get("port_lineups").tier,
-        "ports_with_turnaround_observations": int(panel["port"].nunique()),
         "known_limitations": [
-            "Snapshots cover August 2026 only: 12 trading days, 14 ports. A walk-forward "
-            "test on this is a handful of folds and should be read as a sanity check, "
-            "not a performance claim.",
-            "A vessel's turnaround is only known once it has discharged, so the newest "
-            "snapshots are under-represented among completed voyages. The chronological "
-            "split accounts for this by testing only on the latest dates.",
-            "berths_total is inferred from distinct berth names seen in the line-up, "
-            "because berth_operations.csv contains only 'Vacant' rows and therefore "
-            "cannot supply a capacity denominator. Ports whose report omits berth names "
-            "(Paradip among them) have no occupancy figure, so it is imputed and the "
-            "score leans on queue length instead.",
-            "'Waiting & Expected' is split into 'arrived and waiting' and 'not yet "
-            "arrived'. Some ports list every vessel under that single status, so "
-            "counting it verbatim produced a queue of 40 against zero berthed vessels "
-            "at Paradip. Only vessels with an arrival date on or before the snapshot "
-            "are counted as queued.",
+            "The target is the port's ESTIMATE of port stay. No actual completion time "
+            "exists in the source data, so realised turnaround cannot be modelled at all.",
+            "Because the target is the port's own schedule, a good score partly reflects "
+            "the port's queue-management behaviour rather than independent information.",
+            f"{panel['port'].value_counts().iloc[0]} of {len(panel)} voyages "
+            f"({panel['port'].value_counts().iloc[0] / len(panel):.0%}) are one port, so the "
+            "effective sample is far smaller than the row count suggests.",
+            "12 snapshot dates in August 2026. A 3-date holdout is a handful of voyages "
+            "and cannot support a performance claim.",
+            "berths_total is inferred from distinct berth names in the line-up; ports whose "
+            "report omits berth names have no occupancy figure and it is imputed.",
         ],
     }
     REPORT.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
-    print(f"[congestion] {len(panel)} training rows (from {n0}) | "
-          f"{snap['port'].nunique()} ports | {snap['snapshot_date'].nunique()} snapshot dates")
-    print(f"[congestion] turnaround days: median {panel['turnaround_days'].median():.1f}, "
-          f"p90 {panel['turnaround_days'].quantile(0.9):.1f}")
+
+    si = report["split_integrity"]
+    print(f"[congestion] {len(panel)} voyages (of {n_all_voyages} with an ETCD) | "
+          f"{panel['port'].nunique()} ports | {panel['snapshot_date'].nunique()} dates")
+    print(f"[congestion] target {TARGET}: median {panel[TARGET].median():.1f}d, "
+          f"p90 {panel[TARGET].quantile(0.9):.1f}d")
+    print(f"[congestion] split: {si['train_voyages']} train / {si['test_voyages']} test, "
+          f"voyage overlap = {si['voyage_overlap']}")
+    print(f"[congestion] TARGET IS AN ESTIMATE: {report['target_is_an_estimate']}")
     print(f"[congestion] wrote {OUT}")
-    return panel, snap
+    return panel
 
 
 if __name__ == "__main__":

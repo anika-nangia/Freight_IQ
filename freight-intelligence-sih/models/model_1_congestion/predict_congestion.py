@@ -163,14 +163,25 @@ class CongestionPredictor:
 
     # ----------------------------------------------------------------- scoring
     def _score_turnaround(self, feats: Dict[str, Any]) -> Dict[str, Any]:
+        """Estimate of port stay, as a range.
+
+        `feats` is unused when the deployed artifact is a per-port median, which is
+        what won on held-out data. The parameter is kept so a fitted artifact can be
+        swapped in without changing callers.
+        """
         b = self._bundle
         medians = b.get("impute_medians", {})
-        row = {c: feats.get(c, medians.get(c, 0.0)) for c in b["features"]}
-        for c, v in medians.items():
-            if row.get(c) is None or (isinstance(row.get(c), float) and np.isnan(row[c])):
-                row[c] = v
-        X = np.array([[float(row[c]) for c in b["features"]]], dtype=float)
-        point = float(b["model"].predict(X)[0])
+        if b.get("kind") == "port_median":
+            port = feats.get("port")
+            med = b.get("port_medians", {})
+            point = float(med.get(port, b.get("global_median", 4.0)))
+        else:
+            row = {c: feats.get(c, medians.get(c, 0.0)) for c in b["features"]}
+            for c, v in medians.items():
+                if row.get(c) is None or (isinstance(row.get(c), float) and np.isnan(row[c])):
+                    row[c] = v
+            X = np.array([[float(row[c]) for c in b["features"]]], dtype=float)
+            point = float(b["model"].predict(X)[0])
         q = (self._metrics or {}).get("residual_quantiles_days", {"p50": 0, "p80": 2, "p90": 4})
         return {
             "point_days": point,
@@ -189,12 +200,14 @@ class CongestionPredictor:
             return None
         return {
             "n_vessels": int(len(h)),
-            "median_days": round(float(h["turnaround_days"].median()), 1),
-            "mean_days": round(float(h["turnaround_days"].mean()), 1),
-            "p90_days": round(float(h["turnaround_days"].quantile(0.9)), 1),
+            "median_days": round(float(h["estimated_port_stay_days"].median()), 1),
+            "mean_days": round(float(h["estimated_port_stay_days"].mean()), 1),
+            "p90_days": round(float(h["estimated_port_stay_days"].quantile(0.9)), 1),
             "period": [h["snapshot_date"].min().strftime("%Y-%m-%d"),
                        h["snapshot_date"].max().strftime("%Y-%m-%d")],
-            "note": "completed voyages only (a vessel still working has no ETCD yet)",
+            "what_this_is": "the port's own estimate of port stay, per voyage, as observed "
+                            "while the vessel was berthed. NOT a measured turnaround: the "
+                            "line-up data carries no actual completion or departure field.",
         }
 
     def predict(self, port_name: str) -> Dict[str, Any]:
@@ -217,8 +230,9 @@ class CongestionPredictor:
                                                f"no line-up data for '{p}'"),
             }
 
-        feats = {**lineup, **{k: v for k, v in self._weather_features(p).items()
-                              if k in self._bundle["features"]}}
+        feats = {**lineup, "port": p,
+                 **{k: v for k, v in self._weather_features(p).items()
+                    if k in (self._bundle.get("features") or [])}}
         ta = self._score_turnaround(feats)
         obs = self._observed(p)
 

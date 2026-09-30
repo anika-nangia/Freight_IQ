@@ -1,10 +1,20 @@
 {
-  "trained_at": "2026-09-30T07:15:16+00:00",
-  "target": "turnaround_days (ETCD - arrival, observed per vessel)",
-  "validation_scheme": "chronological block split, last 3 snapshot dates held out entirely",
-  "n_rows": 1608,
-  "n_ports": 11,
+  "trained_at": "2026-09-30T09:25:34+00:00",
+  "target": "estimated_port_stay_days",
+  "target_is_an_estimate": true,
+  "target_warning": "The target is the port's own published schedule (etc_or_etcd - arrival), not a measured turnaround. The source line-up data has no actual completion field, so realised turnaround cannot be modelled. This model predicts what the port says, which is a useful cross-check on the port's own estimate but is not independent ground truth.",
+  "validation_scheme": "chronological block split on the last 3 snapshot dates, with voyage-level disjointness asserted",
+  "n_voyages": 347,
+  "n_ports": 10,
   "n_snapshot_dates": 12,
+  "n_train": 268,
+  "n_test": 79,
+  "test_dates": [
+    "2026-08-26",
+    "2026-08-27",
+    "2026-08-31"
+  ],
+  "voyage_overlap_train_test": 0,
   "features": [
     "queue_waiting",
     "vessels_awaiting_berth",
@@ -20,176 +30,94 @@
     "weather_wind_max_kt",
     "weather_precip_mm"
   ],
+  "sklearn_version": "1.9.1",
   "impute_medians": {
-    "queue_waiting": 3.0,
-    "vessels_awaiting_berth": 3.0,
-    "vessels_working": 6.0,
-    "berths_total": 14.0,
-    "berth_occupancy": 0.444,
-    "queue_ratio": 0.364,
-    "vessels_expected": 12.0,
+    "queue_waiting": 4.0,
+    "vessels_awaiting_berth": 4.0,
+    "vessels_working": 8.5,
+    "berths_total": 17.0,
+    "berth_occupancy": 0.465,
+    "queue_ratio": 0.36,
+    "vessels_expected": 15.0,
     "arrivals_next_7d": 12.0,
-    "working_import": 2.0,
+    "working_import": 0.0,
     "working_export": 0.0,
-    "cargo_tonnage": 788521.0,
-    "weather_wind_max_kt": 12.2,
-    "weather_precip_mm": 84.3
+    "cargo_tonnage": 1464263.195,
+    "weather_wind_max_kt": 11.72,
+    "weather_precip_mm": 45.4
   },
   "candidates": {
     "port_median_baseline": {
-      "mae_days": 2.3123359580052494,
-      "rmse_days": 3.9534695218051854,
-      "r2": -0.03127710173069276,
-      "bias_days": -1.2834645669291338,
-      "n": 381
+      "mae_days": 2.6392405063291138,
+      "rmse_days": 4.182921878667826,
+      "r2": -0.09199933998679954,
+      "bias_days": -1.1708860759493671,
+      "n": 79,
+      "mae_ci95": [
+        1.975,
+        3.386
+      ]
     },
     "global_median_baseline": {
-      "mae_days": 2.545931758530184,
-      "rmse_days": 4.293680884515958,
-      "r2": -0.2164047628138348,
-      "bias_days": -1.811023622047244,
-      "n": 381
+      "mae_days": 2.721518987341772,
+      "rmse_days": 4.138427512773543,
+      "r2": -0.06889137782755639,
+      "bias_days": -1.0506329113924051,
+      "n": 79,
+      "mae_ci95": [
+        2.076,
+        3.43
+      ]
     },
     "gradient_boosting": {
-      "mae_days": 2.3261560830596832,
-      "rmse_days": 3.7935514205916148,
-      "r2": 0.050465967312097515,
-      "bias_days": -0.701876847471061,
-      "n": 381
+      "mae_days": 2.7571199621872657,
+      "rmse_days": 4.256763301775861,
+      "r2": -0.13089392779500253,
+      "bias_days": -1.3079373342139144,
+      "n": 79,
+      "mae_ci95": [
+        2.089,
+        3.474
+      ]
     },
     "random_forest": {
-      "mae_days": 2.607126462296225,
-      "rmse_days": 3.872975097744713,
-      "r2": 0.010289919048348528,
-      "bias_days": -0.02078698047823642,
-      "n": 381
+      "mae_days": 2.9926737315342318,
+      "rmse_days": 4.1431602479492735,
+      "r2": -0.07133755934726294,
+      "bias_days": 0.13248445135005976,
+      "n": 79,
+      "mae_ci95": [
+        2.399,
+        3.631
+      ]
     }
   },
-  "deployed_model": "gradient_boosting",
-  "mae_improvement_vs_port_median_pct": -0.6,
-  "rmse_improvement_vs_port_median_pct": 4.05,
-  "beats_naive_baseline": false,
-  "margin_is_material": false,
-  "materiality_threshold_pct": 5.0,
-  "honest_reading": "The model ties the port-median baseline on MAE (-0.6%) and is +4.0% on RMSE. On 3 held-out snapshot dates that margin is inside noise, so this should be read as 'no demonstrated modelling gain over knowing the port's normal turnaround'. The model is deployed because it also uses queue and occupancy, which a static median ignores, and it degrades gracefully on a port it has never seen.",
+  "best_ml_candidate": "gradient_boosting",
+  "deployed_model": "port_median_baseline",
+  "deployed_is_baseline": true,
+  "deployed_rationale": "A baseline wins on held-out MAE and no fitted model beat it by an amount the data can distinguish from zero, so the baseline is deployed. Shipping the gradient boosting model would add noise and a false impression of skill.",
+  "significance_vs_port_median": {
+    "mae_difference_days": -0.11787945585815156,
+    "ci95_low": -0.3783076846203784,
+    "ci95_high": 0.13702640197853813,
+    "significant_at_95": false,
+    "interpretation": "the difference is inside resampling noise; treat the two as equivalent"
+  },
+  "any_r2_positive": false,
+  "materiality_threshold_days": 0.25,
   "residual_quantiles_days": {
-    "p50": -0.461,
-    "p80": 1.705,
-    "p90": 4.456
+    "p50": 0.0,
+    "p80": 2.0,
+    "p90": 5.0
   },
-  "feature_importance": {
-    "queue_waiting": 0.2454,
-    "working_export": 0.1901,
-    "berth_occupancy": 0.1531,
-    "weather_wind_max_kt": 0.0955,
-    "weather_precip_mm": 0.0677,
-    "berths_total": 0.0623,
-    "cargo_tonnage": 0.0607,
-    "queue_ratio": 0.0535,
-    "arrivals_next_7d": 0.0258,
-    "vessels_expected": 0.0202,
-    "vessels_awaiting_berth": 0.0156,
-    "vessels_working": 0.0097,
-    "working_import": 0.0004
-  },
-  "per_port_observed_vs_predicted": [
-    {
-      "port": "KRISHNAPATNAM",
-      "n": 86,
-      "observed_median_days": 4.0,
-      "predicted_median_days": 4.0,
-      "observed_mean_days": 4.78,
-      "predicted_mean_days": 3.98
-    },
-    {
-      "port": "HALDIA",
-      "n": 58,
-      "observed_median_days": 3.5,
-      "predicted_median_days": 3.67,
-      "observed_mean_days": 4.52,
-      "predicted_mean_days": 3.53
-    },
-    {
-      "port": "VISAKHAPATNAM",
-      "n": 56,
-      "observed_median_days": 5.0,
-      "predicted_median_days": 5.35,
-      "observed_mean_days": 6.59,
-      "predicted_mean_days": 5.31
-    },
-    {
-      "port": "ENNORE",
-      "n": 48,
-      "observed_median_days": 2.5,
-      "predicted_median_days": 3.57,
-      "observed_mean_days": 4.21,
-      "predicted_mean_days": 3.78
-    },
-    {
-      "port": "DHAMRA",
-      "n": 45,
-      "observed_median_days": 5.0,
-      "predicted_median_days": 5.22,
-      "observed_mean_days": 6.4,
-      "predicted_mean_days": 5.34
-    },
-    {
-      "port": "CHENNAI",
-      "n": 40,
-      "observed_median_days": 2.0,
-      "predicted_median_days": 2.7,
-      "observed_mean_days": 2.85,
-      "predicted_mean_days": 2.71
-    },
-    {
-      "port": "GANGAVARAM",
-      "n": 30,
-      "observed_median_days": 2.0,
-      "predicted_median_days": 3.79,
-      "observed_mean_days": 3.43,
-      "predicted_mean_days": 3.79
-    },
-    {
-      "port": "GOPALPUR",
-      "n": 6,
-      "observed_median_days": 8.0,
-      "predicted_median_days": 5.87,
-      "observed_mean_days": 8.0,
-      "predicted_mean_days": 5.87
-    },
-    {
-      "port": "KARAIKAL",
-      "n": 5,
-      "observed_median_days": 3.0,
-      "predicted_median_days": 3.27,
-      "observed_mean_days": 2.8,
-      "predicted_mean_days": 3.4
-    },
-    {
-      "port": "SAGAR",
-      "n": 4,
-      "observed_median_days": 2.0,
-      "predicted_median_days": 3.84,
-      "observed_mean_days": 2.25,
-      "predicted_mean_days": 3.84
-    },
-    {
-      "port": "KATTUPALLI",
-      "n": 3,
-      "observed_median_days": 4.0,
-      "predicted_median_days": 3.34,
-      "observed_mean_days": 4.33,
-      "predicted_mean_days": 3.34
-    }
-  ],
   "provenance": {
-    "target": "observed (port authority line-up: arrival and ETCD per vessel)",
-    "features": "observed (same line-up) + Open-Meteo weather"
+    "target": "estimated by the port (not an outcome)",
+    "features": "observed line-up state + Open-Meteo weather"
   },
   "known_limitations": [
-    "Only 12 snapshot dates in one month. The held-out set is 3 dates, so this is a sanity check on direction, not a performance claim.",
-    "ETCD is reported by the port and its accuracy is not verifiable here.",
-    "Turnaround is only observable once a vessel completes discharge, so recent snapshots contribute fewer completed voyages. The chronological split puts those dates in the test set, which is the honest arrangement.",
-    "A turnaround figure describes a completed voyage. The live congestion SCORE is a separate, forward-looking quantity and is not this target."
+    "111 contributes 0 of 347 voyages (0%), so the effective sample is much smaller than the row count.",
+    "Only 3 held-out dates and 79 voyages. The confidence intervals above are wide for that reason; read them before the point estimates.",
+    "No realised turnaround exists in the data. If actual port stay matters, this needs a completion or departure field that the line-up does not carry.",
+    "Because the target is the port's own schedule, part of any skill is the port anticipating its own queue, not the model anticipating the port."
   ]
 }

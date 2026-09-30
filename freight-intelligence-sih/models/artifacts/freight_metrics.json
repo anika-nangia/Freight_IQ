@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-09-30T07:19:38+00:00",
+  "trained_at": "2026-09-30T09:25:30+00:00",
   "validation_scheme": "walk-forward refit every week, min 12 training weeks, scored on the unseen week only",
   "target": "log(rate[t+2w] / rate[t])",
   "loss": "asymmetric, alpha=2.5 under-forecast / beta=1.0 over-forecast",
@@ -17,9 +17,25 @@
     "ret_2w",
     "ret_4w",
     "roll_cv_8w",
-    "dev_from_mean_4w"
+    "dev_from_mean_4w",
+    "log_rate",
+    "log_rate_vs_class",
+    "load_port_code",
+    "vessel_class_code",
+    "coal_aus_ret_4w",
+    "coal_saf_ret_4w",
+    "iron_ore_ret_4w",
+    "crude_oil_ret_4w",
+    "coal_aus_level",
+    "coal_saf_level",
+    "iron_ore_level",
+    "crude_oil_level",
+    "wind_max_kt",
+    "log_precip",
+    "rainy_days"
   ],
   "features_available_but_not_validated": [
+    "momentum",
     "weather",
     "commodity",
     "baltic",
@@ -51,66 +67,136 @@
       "n": 88
     },
     "ridge": {
-      "asym_regret_logret": 0.2453480309205095,
-      "mae_usd_mt": 3.9774985330788635,
-      "rmse_usd_mt": 5.697084989433998,
-      "mean_abs_pct_error": 13.705970722622492,
-      "bias_usd_mt": 0.7706926035308502,
-      "directional_accuracy_material": 0.7738095238095238,
+      "asym_regret_logret": 0.25113076360445524,
+      "mae_usd_mt": 4.50439105179973,
+      "rmse_usd_mt": 6.898484128852313,
+      "mean_abs_pct_error": 16.15699586963703,
+      "bias_usd_mt": -0.06636283552735799,
+      "directional_accuracy_material": 0.8333333333333334,
       "n": 88
     },
     "xgb": {
-      "asym_regret_logret": 0.22402452013565755,
-      "mae_usd_mt": 3.121465962854298,
-      "rmse_usd_mt": 4.669606855784206,
-      "mean_abs_pct_error": 9.694124232769243,
-      "bias_usd_mt": 1.8222326288981874,
-      "directional_accuracy_material": 0.9047619047619048,
+      "asym_regret_logret": 0.22446180116790845,
+      "mae_usd_mt": 3.1335146531462668,
+      "rmse_usd_mt": 4.704287759003671,
+      "mean_abs_pct_error": 9.789415048911163,
+      "bias_usd_mt": 1.9318071573701774,
+      "directional_accuracy_material": 0.8571428571428571,
       "n": 88
     }
   },
   "deployed_model": "xgb",
-  "regret_reduction_vs_persistence_pct": 18.77,
+  "regret_reduction_vs_persistence_pct": 18.61,
+  "regret_reduction_range_across_seeds_pct": [
+    17.48,
+    19.78
+  ],
+  "seed_sensitivity": {
+    "seeds": [
+      11,
+      42,
+      123,
+      2024
+    ],
+    "candidates": {
+      "persistence": {
+        "min": 0.27579,
+        "max": 0.27579,
+        "spread": 0.0,
+        "values": [
+          0.27579,
+          0.27579,
+          0.27579,
+          0.27579
+        ]
+      },
+      "arima": {
+        "min": 0.24647,
+        "max": 0.24647,
+        "spread": 0.0,
+        "values": [
+          0.24647,
+          0.24647,
+          0.24647,
+          0.24647
+        ]
+      },
+      "ridge": {
+        "min": 0.25113,
+        "max": 0.25113,
+        "spread": 0.0,
+        "values": [
+          0.25113,
+          0.25113,
+          0.25113,
+          0.25113
+        ]
+      },
+      "xgb": {
+        "min": 0.22125,
+        "max": 0.22759,
+        "spread": 0.00634,
+        "values": [
+          0.22367,
+          0.22446,
+          0.22125,
+          0.22759
+        ]
+      }
+    }
+  },
+  "significance_vs_persistence": {
+    "available": true,
+    "candidate_a": "xgb",
+    "candidate_b": "persistence",
+    "n_weeks": 8,
+    "mean_regret_improvement_of_a": 0.07161,
+    "ci95_low": 0.01734,
+    "ci95_high": 0.14533,
+    "significant_at_95": true,
+    "verdict": "xgb reliably better than persistence"
+  },
+  "headline_caveat": "Only 8 out-of-sample weeks. The regret reduction moves between 17.5% and 19.8% across seeds, so quote the range. The ranking (XGBoost ahead of ARIMA, Ridge and persistence) is stable, the margins are not large.",
   "conformal_intervals": {
     "p50": {
-      "lower_offset": 0.06095543036092434,
-      "upper_offset": 0.09637899784815021
+      "lower_offset": 0.061567920609679395,
+      "upper_offset": 0.09734742996350476
     },
     "p80": {
-      "lower_offset": 0.16425039468832459,
-      "upper_offset": 0.25970267689836396
+      "lower_offset": 0.16645187357392055,
+      "upper_offset": 0.2631835206479902
     },
     "p90": {
-      "lower_offset": 0.2649673484644144,
-      "upper_offset": 0.418950163361534
+      "lower_offset": 0.2539635604844971,
+      "upper_offset": 0.4015516469084731
     }
   },
   "regime_check": {
     "available": true,
     "training_move_p75_logret": 0.05816,
     "high_vol_regime": {
-      "asym_regret_logret": 0.4592782151456077,
-      "mae_usd_mt": 5.681873086922699,
-      "rmse_usd_mt": 6.892570719705507,
-      "mean_abs_pct_error": 16.110389403910183,
-      "bias_usd_mt": 5.489562460813257,
-      "directional_accuracy_material": 0.9166666666666666,
+      "asym_regret_logret": 0.45470141215133025,
+      "mae_usd_mt": 5.703682712763548,
+      "rmse_usd_mt": 6.974342441665858,
+      "mean_abs_pct_error": 15.868351527201483,
+      "bias_usd_mt": 5.654344369024038,
+      "directional_accuracy_material": 0.8611111111111112,
       "n": 36
     },
     "normal_regime": {
-      "asym_regret_logret": 0.061156577436461364,
-      "mae_usd_mt": 1.3488764154223292,
-      "rmse_usd_mt": 2.00282953673116,
-      "mean_abs_pct_error": 5.252094498902438,
-      "bias_usd_mt": -0.7166880239660921,
-      "directional_accuracy_material": 0.8958333333333334,
+      "asym_regret_logret": 0.06506514741015502,
+      "mae_usd_mt": 1.3541675349496873,
+      "rmse_usd_mt": 1.9433128056266795,
+      "mean_abs_pct_error": 5.580920563940943,
+      "bias_usd_mt": -0.6453339891594189,
+      "directional_accuracy_material": 0.8541666666666666,
       "n": 52
     }
   },
   "feature_group_ablation": {
     "reference_candidate": "xgb",
     "reference_regret": 0.22446,
-    "note": "positive regret_delta means the model got WORSE without the group, i.e. the group helped",
+    "note": "A group is called helpful only when the paired bootstrap over weeks puts the regret difference above zero at 95%. A point estimate alone is not evidence: the differences here are of the same order as week-to-week noise, and a zero-tolerance rule gave verdicts that flipped between machines.",
     "groups": {
       "momentum": {
         "available": true,
@@ -124,7 +210,19 @@
         "best_candidate_without": "arima",
         "regret_without": 0.24647,
         "regret_delta": 0.02201,
-        "helps": true
+        "helps": null,
+        "verdict": "no reliable effect (95% interval spans zero)",
+        "bootstrap": {
+          "available": true,
+          "candidate_a": "arima",
+          "candidate_b": "xgb",
+          "n_weeks": 8,
+          "mean_regret_improvement_of_a": -0.05826,
+          "ci95_low": -0.13641,
+          "ci95_high": 0.00013,
+          "significant_at_95": false,
+          "verdict": "no reliable difference; the effect is smaller than week-to-week noise"
+        }
       },
       "weather": {
         "available": true,
@@ -136,7 +234,19 @@
         "best_candidate_without": "xgb",
         "regret_without": 0.22303,
         "regret_delta": -0.00143,
-        "helps": false
+        "helps": null,
+        "verdict": "no reliable effect (95% interval spans zero)",
+        "bootstrap": {
+          "available": true,
+          "candidate_a": "xgb",
+          "candidate_b": "xgb",
+          "n_weeks": 8,
+          "mean_regret_improvement_of_a": -0.00113,
+          "ci95_low": -0.0092,
+          "ci95_high": 0.00545,
+          "significant_at_95": false,
+          "verdict": "no reliable difference; the effect is smaller than week-to-week noise"
+        }
       },
       "commodity": {
         "available": true,
@@ -153,7 +263,19 @@
         "best_candidate_without": "xgb",
         "regret_without": 0.22211,
         "regret_delta": -0.00235,
-        "helps": false
+        "helps": null,
+        "verdict": "no reliable effect (95% interval spans zero)",
+        "bootstrap": {
+          "available": true,
+          "candidate_a": "xgb",
+          "candidate_b": "xgb",
+          "n_weeks": 8,
+          "mean_regret_improvement_of_a": -0.0015,
+          "ci95_low": -0.0103,
+          "ci95_high": 0.00734,
+          "significant_at_95": false,
+          "verdict": "no reliable difference; the effect is smaller than week-to-week noise"
+        }
       },
       "baltic": {
         "available": false,
@@ -170,25 +292,46 @@
         "best_candidate_without": "xgb",
         "regret_without": 0.22218,
         "regret_delta": -0.00229,
-        "helps": false
+        "helps": null,
+        "verdict": "no reliable effect (95% interval spans zero)",
+        "bootstrap": {
+          "available": true,
+          "candidate_a": "xgb",
+          "candidate_b": "xgb",
+          "n_weeks": 8,
+          "mean_regret_improvement_of_a": -0.00391,
+          "ci95_low": -0.02642,
+          "ci95_high": 0.01376,
+          "significant_at_95": false,
+          "verdict": "no reliable difference; the effect is smaller than week-to-week noise"
+        }
       }
     }
   },
   "deployment_artifact": {
     "kind": "xgb",
-    "path": "models\\artifacts\\freight_walkforward.json",
+    "path": "models/artifacts/freight_walkforward.json",
     "feature_importance_gain": {
-      "ret_4w": 0.3035,
-      "ret_2w": 0.2338,
-      "dev_from_mean_4w": 0.1882,
-      "roll_cv_8w": 0.1497,
-      "ret_1w": 0.1248
+      "rainy_days": 0.3885,
+      "log_precip": 0.1781,
+      "ret_4w": 0.0745,
+      "dev_from_mean_4w": 0.0617,
+      "log_rate": 0.058,
+      "ret_2w": 0.0487,
+      "wind_max_kt": 0.043,
+      "ret_1w": 0.0389,
+      "log_rate_vs_class": 0.0354,
+      "roll_cv_8w": 0.0322,
+      "load_port_code": 0.0296,
+      "vessel_class_code": 0.0061,
+      "coal_aus_ret_4w": 0.0043,
+      "crude_oil_ret_4w": 0.001
     }
   },
   "provenance": {
     "target": "observed (project dataset, upstream publication unconfirmed)",
-    "features_actually_used": "ret_1w, ret_2w, ret_4w, roll_cv_8w, dev_from_mean_4w",
-    "features_available_but_excluded": "weather, commodity, baltic, level",
+    "features_actually_used": "ret_1w, ret_2w, ret_4w, roll_cv_8w, dev_from_mean_4w, log_rate, log_rate_vs_class, load_port_code, vessel_class_code, coal_aus_ret_4w, coal_saf_ret_4w, iron_ore_ret_4w, crude_oil_ret_4w, coal_aus_level, coal_saf_level, iron_ore_level, crude_oil_level, wind_max_kt, log_precip, rainy_days",
+    "features_available_but_excluded": "momentum, weather, commodity, baltic, level",
     "market_data_fetched": "World Bank Pink Sheet and Open-Meteo, both observed, but the ablation shows they do not add to the forecast at this sample size",
     "baltic_index_features": "unavailable - no free source reachable"
   }

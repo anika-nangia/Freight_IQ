@@ -1,23 +1,35 @@
 # Runtime dependencies for the FreightIQ backend and data pipeline.
 #
-# Pinned loosely: the pipeline was developed against Python 3.14 with the versions
-# below. Nothing here is required at API request time except fastapi/uvicorn/pydantic,
-# because models are loaded from disk rather than retrained per request.
+# PINS ARE DELIBERATE for scikit-learn and xgboost, not a style choice.
+#
+# The congestion artifact is a pickle containing a fitted sklearn estimator. Pickles
+# are version-coupled: a model fitted on 1.9.1 raises an InconsistentVersionWarning and
+# may fail outright on 1.8, and the reverse also fails. The same applies to XGBoost
+# boosters. A rebuild on a different version silently produces different walk-forward
+# numbers, which is how a headline can move from 18.8% to 20.2% without any code change.
+#
+# So: exact pins, and the versions are recorded inside the artifacts themselves
+# (congestion_model.json carries sklearn_version; freight_metrics.json records the
+# model kind and path). models/artifacts/freight_model_card.md reports the regret
+# range across seeds, which is what to compare against a rebuild.
+#
+# Verified on Python 3.14. Python 3.12 was also used and produced the same qualitative
+# results, though the exact regret figures move within the seed range.
 
 # --- API
-fastapi>=0.115
-uvicorn[standard]>=0.30
-pydantic>=2.7
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+pydantic>=2.7,<3.0
 
 # --- Data
 numpy>=1.26
 pandas>=2.1
 openpyxl>=3.1          # reads the World Bank Pink Sheet workbook
 
-# --- Models
-scikit-learn>=1.4      # Ridge, gradient boosting, random forest, standardisation
-xgboost>=2.0           # Model 2 deployed learner
-statsmodels>=0.14      # per-lane ARIMA baseline
+# --- Models: EXACT PINS, see note above
+scikit-learn==1.9.1
+xgboost==3.4.1
+statsmodels>=0.14,<0.16   # per-lane ARIMA baseline
 
 # --- Tests
 pytest>=8.0

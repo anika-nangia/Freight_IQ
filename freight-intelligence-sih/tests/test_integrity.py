@@ -6,6 +6,7 @@ Run: python -m pytest tests -q     (or: python tests/test_integrity.py)
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -95,13 +96,53 @@ def test_training_uses_no_rows_whose_target_is_missing():
     assert (df["future_rate"].notna()).all()
 
 
-def test_congestion_target_is_observed_not_inferred():
+def test_congestion_target_is_never_called_realised():
+    """ETCD is the port's forward-looking schedule. There is no completion field."""
     df = pd.read_csv(CONGESTION, parse_dates=["arrival", "etcd"])
-    assert df["turnaround_days"].notna().all()
+    cols = [c.lower() for c in df.columns]
+    assert not any(re.search(r"actual|complet|depart|sail", c) for c in cols), \
+        "a column implying a realised outcome appeared; re-read the target definition"
+    m = json.loads(CONGESTION_METRICS.read_text(encoding="utf-8"))
+    assert m["target"] == "estimated_port_stay_days", \
+        "the target must not be named as a realised turnaround"
+    assert m["target_is_an_estimate"] is True
+    assert "ETCD" in m["target_warning"] or "completion" in m["target_warning"].lower()
+    # The arithmetic is still ETCD minus arrival; the naming is what changed.
     delta = (df["etcd"] - df["arrival"]).dt.total_seconds() / 86400.0
-    assert np.allclose(delta, df["turnaround_days"], atol=1e-6), \
-        "turnaround_days must equal ETCD minus arrival"
-    assert (df["turnaround_days"] >= 0).all(), "negative turnaround present"
+    assert np.allclose(delta, df["estimated_port_stay_days"], atol=1e-6)
+
+
+def test_congestion_dataset_has_one_row_per_voyage():
+    """The old build counted the same voyage once per snapshot (1,608 rows, 692 voyages)."""
+    df = pd.read_csv(CONGESTION)
+    assert df["voyage_key"].is_unique, \
+        "a voyage appears more than once; the target is being pseudo-replicated"
+    # And only voyages that had actually arrived, so the arrival leg is not an ETA.
+    assert (df["arrival"] <= df["snapshot_date"]).all(), \
+        "a row exists for a voyage that had not arrived at the snapshot date"
+
+
+def test_congestion_train_test_split_is_voyage_disjoint():
+    """Holding out dates alone leaked 80% of held-out rows before this was fixed."""
+    from models.model_1_congestion.train_congestion import split_voyage_disjoint
+    df = pd.read_csv(CONGESTION, parse_dates=["snapshot_date"])
+    tr, te, _ = split_voyage_disjoint(df)
+    assert not (set(tr["voyage_key"]) & set(te["voyage_key"])), \
+        "a voyage appears in both train and test"
+    m = json.loads(CONGESTION_METRICS.read_text(encoding="utf-8"))
+    assert m["voyage_overlap_train_test"] == 0
+
+
+def test_congestion_headline_reports_an_interval():
+    m = json.loads(CONGESTION_METRICS.read_text(encoding="utf-8"))
+    for name, s in m["candidates"].items():
+        lo, hi = s["mae_ci95"]
+        assert lo <= s["mae_days"] <= hi, f"{name} point estimate outside its own CI"
+    sig = m["significance_vs_port_median"]
+    assert "ci95_low" in sig and "ci95_high" in sig
+    assert (sig["ci95_low"] <= sig["mae_difference_days"] <= sig["ci95_high"])
+    # The deployed choice must be justified against that interval, not a raw ranking.
+    assert m["deployed_rationale"]
 
 
 # --------------------------------------------------------------------------
@@ -158,15 +199,72 @@ def test_congestion_metrics_are_computed_not_hardcoded():
     """The old trainer returned a literal dict. Compare against the data instead."""
     m = json.loads(CONGESTION_METRICS.read_text(encoding="utf-8"))
     df = pd.read_csv(CONGESTION)
-    assert m["n_rows"] == len(df), "reported row count does not match the dataset"
+    assert m["n_voyages"] == len(df), "reported voyage count does not match the dataset"
     assert m["n_ports"] == df["port"].nunique()
     assert m["n_snapshot_dates"] == df["snapshot_date"].nunique()
+    assert m["n_train"] + m["n_test"] == len(df)
     for name, s in m["candidates"].items():
-        assert s["n"] == m["n_test_rows_expected"] if "n_test_rows_expected" in m else True
         assert s["mae_days"] >= 0
+        assert s["n"] == m["n_test"], f"{name} scored on {s['n']} rows, expected {m['n_test']}"
     # A real fit on this data cannot produce a suspiciously round 0.884 R2.
-    assert any(abs(s["r2"] or 0 - 0.884) > 1e-6 for s in m["candidates"].values()), \
+    assert any(abs((s["r2"] or 0) - 0.884) > 1e-6 for s in m["candidates"].values()), \
         "an R2 of exactly 0.884 is the old hardcoded value"
+
+
+def test_congestion_records_the_library_version_it_was_fitted_with():
+    """A pickled estimator is version-coupled; the version must travel with it."""
+    import pickle
+    with (ROOT / "models" / "artifacts" / "congestion_model.json").open("rb") as fh:
+        art = pickle.load(fh)
+    assert art.get("sklearn_version"), "artifact does not record the sklearn version"
+    m = json.loads(CONGESTION_METRICS.read_text(encoding="utf-8"))
+    assert m.get("sklearn_version") == art["sklearn_version"]
+
+
+def test_model2_headline_is_a_range_with_a_significance_test():
+    m = json.loads(FREIGHT_METRICS.read_text(encoding="utf-8"))
+    rng = m.get("regret_reduction_range_across_seeds_pct")
+    assert rng and len(rng) == 2 and rng[0] <= rng[1], \
+        "the headline must be quoted as a range across seeds, not a single number"
+    sig = m.get("significance_vs_persistence")
+    assert sig and sig.get("available"), "no significance test on the headline"
+    assert "ci95_low" in sig and "ci95_high" in sig
+    seeds = m.get("seed_sensitivity", {}).get("candidates", {})
+    for name in ("xgb", "arima", "ridge", "persistence"):
+        assert name in seeds, f"seed sensitivity missing for {name}"
+    # A seed sweep that returns an identical value for every seed is not a sweep.
+    assert seeds["xgb"]["spread"] > 0, \
+        "every seed produced an identical regret; the seed is not reaching the model"
+
+
+def test_model2_ablation_uses_a_noise_floor_not_a_sign_test():
+    """`helps` must be tri-state. A zero-tolerance rule flipped between machines."""
+    m = json.loads(FREIGHT_METRICS.read_text(encoding="utf-8"))
+    groups = m["feature_group_ablation"]["groups"]
+    tested = {g: r for g, r in groups.items() if r.get("available")}
+    assert tested, "no feature group was testable"
+    for g, r in tested.items():
+        assert "verdict" in r, f"{g} has no human-readable verdict"
+        assert r["helps"] in (True, False, None), \
+            f"{g}: 'helps' must be able to say None (inconclusive), got {r['helps']}"
+        b = r.get("bootstrap", {})
+        if b.get("available"):
+            assert "ci95_low" in b and "ci95_high" in b, f"{g} has no interval"
+            # A significant verdict must match the interval's sign.
+            if b["significant_at_95"]:
+                assert r["helps"] == (b["ci95_low"] > 0), \
+                    f"{g}: verdict and interval disagree"
+
+
+def test_model2_deployed_features_match_the_artifact():
+    m = json.loads(FREIGHT_METRICS.read_text(encoding="utf-8"))
+    art = m.get("deployment_artifact", {})
+    if art.get("kind") == "xgb":
+        # The saved path must be portable, not a Windows separator.
+        assert "\\" not in art["path"], f"artifact path is not portable: {art['path']}"
+        assert (ROOT / art["path"]).exists(), f"artifact path does not resolve: {art['path']}"
+        assert set(art["feature_importance_gain"]) <= set(m["features"]), \
+            "the saved model reports importance for features it was not trained on"
 
 
 def test_congestion_validation_is_chronological():

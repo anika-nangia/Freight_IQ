@@ -1,6 +1,6 @@
 # Model 2 - Freight Rate Forecaster: Model Card
 
-Trained 2026-09-30T07:19:38+00:00 | target `log(rate[t+2w] / rate[t])` | loss asymmetric, alpha=2.5 under-forecast / beta=1.0 over-forecast
+Trained 2026-09-30T09:25:30+00:00 | target `log(rate[t+2w] / rate[t])` | loss asymmetric, alpha=2.5 under-forecast / beta=1.0 over-forecast
 
 ## Validation
 walk-forward refit every week, min 12 training weeks, scored on the unseen week only.
@@ -12,38 +12,57 @@ walk-forward refit every week, min 12 training weeks, scored on the unseen week 
 |---|---|---|---|---|---|
 | persistence | 0.2758 | 3.341 | 5.066 | 9.66 | n/a |
 | arima | 0.2465 | 3.065 | 4.740 | 9.06 | 80 |
-| ridge | 0.2453 | 3.977 | 5.697 | 13.71 | 77 |
-| xgb | 0.2240 | 3.121 | 4.670 | 9.69 | 90 |
+| ridge | 0.2511 | 4.504 | 6.898 | 16.16 | 83 |
+| xgb | 0.2245 | 3.134 | 4.704 | 9.79 | 86 |
 
 ## Deployed model: `xgb`
-Asymmetric regret +18.8% versus persistence.
+Asymmetric regret +18.6% versus persistence on a single seed.
+
+### Is that difference real?
+
+Paired bootstrap over 8 out-of-sample weeks: regret improvement **+0.0716**, 95% CI [+0.0173, +0.1453].
+
+Verdict: **xgb reliably better than persistence**.
+
+### Quote this as a range, not a point
+
+Across 4 seeds the regret reduction is **+17.5% to +19.8%**.
+
+| candidate | regret range across seeds | spread |
+|---|---|---|
+| persistence | 0.2758 to 0.2758 | 0.0000 |
+| arima | 0.2465 to 0.2465 | 0.0000 |
+| ridge | 0.2511 to 0.2511 | 0.0000 |
+| xgb | 0.2213 to 0.2276 | 0.0063 |
+
+Only 8 out-of-sample weeks. The regret reduction moves between 17.5% and 19.8% across seeds, so quote the range. The ranking (XGBoost ahead of ARIMA, Ridge and persistence) is stable, the margins are not large.
 
 ## Intervals
 Conformal, from walk-forward residuals, with the upper band widened for the 2.5x under-forecast penalty.
 
 | coverage | lower offset | upper offset |
 |---|---|---|
-| p50 | 0.0610 | 0.0964 |
-| p80 | 0.1643 | 0.2597 |
-| p90 | 0.2650 | 0.4190 |
+| p50 | 0.0616 | 0.0973 |
+| p80 | 0.1665 | 0.2632 |
+| p90 | 0.2540 | 0.4016 |
 
 ## Feature-group ablation
 
-Reference: `xgb` at regret 0.22446. positive regret_delta means the model got WORSE without the group, i.e. the group helped.
+Reference: `xgb` at regret 0.22446.
 
-| group | regret without it | delta | verdict |
+A group is called helpful only when the paired bootstrap over weeks puts the regret difference above zero at 95%. A point estimate alone is not evidence: the differences here are of the same order as week-to-week noise, and a zero-tolerance rule gave verdicts that flipped between machines.
+
+| group | regret without it | 95% CI on the difference | verdict |
 |---|---|---|---|
-| momentum | 0.2465 | +0.0220 | helps |
-| weather | 0.2230 | -0.0014 | no measurable benefit |
-| commodity | 0.2221 | -0.0024 | no measurable benefit |
+| momentum | 0.2465 | [-0.1364, +0.0001] | no reliable effect (95% interval spans zero) |
+| weather | 0.2230 | [-0.0092, +0.0054] | no reliable effect (95% interval spans zero) |
+| commodity | 0.2221 | [-0.0103, +0.0073] | no reliable effect (95% interval spans zero) |
 | baltic | - | - | not testable: no feature from this group survived panel pruning |
-| level | 0.2222 | -0.0023 | no measurable benefit |
+| level | 0.2222 | [-0.0264, +0.0138] | no reliable effect (95% interval spans zero) |
 
-**The deployed model uses only: ret_1w, ret_2w, ret_4w, roll_cv_8w, dev_from_mean_4w.**
+Features **excluded** from the deployed model: momentum, weather, commodity, baltic, level.
 
-Groups **weather, commodity, baltic, level** are excluded from the deployed model. Feature importance ranked weather at the top, but removing it changed regret by roughly 0.001, i.e. not at all. Over five months rainfall is largely a proxy for the monsoon, and a tree will use it to identify the period rather than to explain a rate. Importance is not contribution, and this is the difference between the two.
-
-A group that shows no measurable benefit is not evidence of a driver. It is evidence that the model found another way to reach the same answer.
+The practical reading: the only finding that survives a noise floor is that a fitted model beats persistence. Which features produce that is not established on 8 out-of-sample weeks, and should not be asserted to a reviewer.
 
 
 ## Regime robustness
@@ -52,16 +71,16 @@ Training-move 75th percentile: 0.0582 log-return.
 
 | regime | rows | regret | MAE $/MT |
 |---|---|---|---|
-| high-volatility | 36 | 0.4593 | 5.682 |
-| normal | 52 | 0.0612 | 1.349 |
+| high-volatility | 36 | 0.4547 | 5.704 |
+| normal | 52 | 0.0651 | 1.354 |
 
 This is the check the earlier single-split run could not do. If the two regimes differ sharply, the headline number describes the calm period only.
 
 ## Provenance
 
 - Target rates: observed (project dataset, upstream publication unconfirmed)
-- Features in the deployed model: ret_1w, ret_2w, ret_4w, roll_cv_8w, dev_from_mean_4w
-- Fetched but excluded: weather, commodity, baltic, level
+- Features in the deployed model: ret_1w, ret_2w, ret_4w, roll_cv_8w, dev_from_mean_4w, log_rate, log_rate_vs_class, load_port_code, vessel_class_code, coal_aus_ret_4w, coal_saf_ret_4w, iron_ore_ret_4w, crude_oil_ret_4w, coal_aus_level, coal_saf_level, iron_ore_level, crude_oil_level, wind_max_kt, log_precip, rainy_days
+- Fetched but excluded: momentum, weather, commodity, baltic, level
 - Market data: World Bank Pink Sheet and Open-Meteo, both observed, but the ablation shows they do not add to the forecast at this sample size
 - Baltic index features: unavailable - no free source reachable
 

@@ -47,6 +47,7 @@ ALPHA, BETA = 2.5, 1.0
 HORIZON_WEEKS = 2
 MIN_TRAIN_WEEKS = 12
 RANDOM_SEED = 42
+N_BOOTSTRAP = 2000
 
 FEATURE_GROUPS = {
     "momentum": ["ret_1w", "ret_2w", "ret_4w", "ret_8w", "roll_cv_8w", "dev_from_mean_4w"],
@@ -196,14 +197,15 @@ def predict_ridge(tr: pd.DataFrame, te: pd.DataFrame, feats: List[str],
 
 
 def predict_xgb(tr: pd.DataFrame, te: pd.DataFrame, feats: List[str],
-                seed: int = RANDOM_SEED) -> np.ndarray:
+                seed: Optional[int] = None) -> np.ndarray:
     """XGBoost with the asymmetric regret objective.
 
-    L = w * (p - y)^2 / 2,  w = alpha when p < y else beta
-    dL/dp = w * (p - y)   -> negative when under-forecasting, which pushes p UP.
-    The sign of that gradient is asserted in tests/test_model2.py.
+    `seed` is threaded explicitly rather than read from a module global: a default
+    argument captures its value at definition time, so a global reassignment never
+    reached the model and every 'seed sensitivity' run returned an identical number.
     """
     import xgboost as xgb
+    seed = RANDOM_SEED if seed is None else seed
 
     def obj(preds: np.ndarray, dtrain):
         err = preds - dtrain.get_label()
@@ -222,7 +224,8 @@ def predict_xgb(tr: pd.DataFrame, te: pd.DataFrame, feats: List[str],
 # walk-forward
 # --------------------------------------------------------------------------
 def walk_forward(df: pd.DataFrame, feats: List[str],
-                 min_train_weeks: int = MIN_TRAIN_WEEKS) -> Dict[str, Any]:
+                 min_train_weeks: int = MIN_TRAIN_WEEKS,
+                 seed: int = RANDOM_SEED) -> Dict[str, Any]:
     """Refit at every week; score only the unseen week.
 
     Returns per-candidate out-of-sample predictions for the whole tail, which is
@@ -242,7 +245,7 @@ def walk_forward(df: pd.DataFrame, feats: List[str],
         oof["persistence"].append(Prediction(te, predict_persistence(tr, te), "persistence"))
         oof["arima"].append(Prediction(te, predict_arima(tr, te), "arima"))
         oof["ridge"].append(Prediction(te, predict_ridge(tr, te, feats), "ridge"))
-        oof["xgb"].append(Prediction(te, predict_xgb(tr, te, feats), "xgb"))
+        oof["xgb"].append(Prediction(te, predict_xgb(tr, te, feats, seed=seed), "xgb"))
 
     results: Dict[str, Any] = {}
     for name, preds in oof.items():
@@ -345,8 +348,11 @@ def ablation(df: pd.DataFrame, feats: List[str], groups: Dict[str, List[str]],
     out: Dict[str, Any] = {
         "reference_candidate": base_key,
         "reference_regret": round(base, 5),
-        "note": "positive regret_delta means the model got WORSE without the group, "
-                "i.e. the group helped",
+        "note": "A group is called helpful only when the paired bootstrap over weeks puts "
+                "the regret difference above zero at 95%. A point estimate alone is not "
+                "evidence: the differences here are of the same order as week-to-week "
+                "noise, and a zero-tolerance rule gave verdicts that flipped between "
+                "machines.",
         "groups": {},
     }
     for name, cols in groups.items():
@@ -363,15 +369,115 @@ def ablation(df: pd.DataFrame, feats: List[str], groups: Dict[str, List[str]],
             continue
         k = min(wf, key=lambda x: wf[x]["metrics"]["asym_regret_logret"])
         reg = wf[k]["metrics"]["asym_regret_logret"]
+        # Noise floor. `helps = reg > base` had zero tolerance, so a 0.002 difference
+        # decided the outcome and the verdict flipped between machines. The bootstrap
+        # over weeks is the arbiter; a point estimate only breaks a tie when the
+        # interval cannot tell us.
+        # Compare the reduced-feature model against the FULL-feature reference, on
+        # the same week draws. The two feature sets must be passed separately.
+        boot = week_level_bootstrap(df, k, reduced, base_key, feats)
+        if boot.get("available") and boot["significant_at_95"]:
+            helps = boot["ci95_low"] > 0      # removing the group made regret WORSE
+            verdict = "helps" if helps else "HURTS (removing it improved regret)"
+        else:
+            helps = None
+            verdict = "no reliable effect (95% interval spans zero)"
         out["groups"][name] = {
             "available": True,
             "features_removed": present,
             "best_candidate_without": k,
             "regret_without": round(reg, 5),
             "regret_delta": round(reg - base, 5),
-            "helps": bool(reg > base),
+            "helps": helps,
+            "verdict": verdict,
+            "bootstrap": boot,
         }
     return out
+
+
+def week_level_bootstrap(df: pd.DataFrame, cand_a: str, feats_a: List[str],
+                         cand_b: str, feats_b: List[str],
+                         n: int = N_BOOTSTRAP, seed: int = RANDOM_SEED) -> Dict[str, Any]:
+    """Paired bootstrap over WEEKS on the regret DIFFERENCE between two candidates.
+
+    Resampling weeks (the cluster unit) rather than rows is the correct test here: the
+    11 lanes in a week share a market, so their errors are not independent, and
+    resampling rows would understate the interval by treating one market move as
+    several independent observations.
+
+    `improvement[week] = regret_b - regret_a`, so a POSITIVE value means candidate A
+    is the better of the two. The previous version compared two candidates that were
+    both built on the same feature set, which returns exactly zero every time and
+    would have read as 'no effect' for the wrong reason. The two feature sets must be
+    passed separately, and the sign convention is asserted in the tests.
+
+    Returns an interval. A point estimate on its own is not evidence: the observed
+    differences here are the same order as week-to-week noise, and a zero-tolerance
+    rule produced verdicts that flipped between machines.
+    """
+    wa = _weekwise_regret(df, cand_a, feats_a)
+    wb = _weekwise_regret(df, cand_b, feats_b)
+    weeks = sorted(set(wa) & set(wb))
+    if len(weeks) < 3:
+        return {"available": False, "reason": f"only {len(weeks)} common weeks"}
+    diffs = np.array([wb[w] - wa[w] for w in weeks])   # >0 means A better than B
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, len(diffs), size=(n, len(diffs)))
+    boots = diffs[idx].mean(axis=1)
+    lo, hi = float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))
+    if cand_a == cand_b and set(feats_a) == set(feats_b):
+        return {"available": False, "reason": "identical candidates compared"}
+    return {
+        "available": True,
+        "candidate_a": cand_a, "candidate_b": cand_b,
+        "n_weeks": len(weeks),
+        "mean_regret_improvement_of_a": round(float(diffs.mean()), 5),
+        "ci95_low": round(lo, 5), "ci95_high": round(hi, 5),
+        "significant_at_95": bool(lo > 0 or hi < 0),
+        "verdict": (f"{cand_a} reliably better than {cand_b}" if lo > 0 else
+                    f"{cand_b} reliably better than {cand_a}" if hi < 0 else
+                    "no reliable difference; the effect is smaller than week-to-week noise"),
+    }
+
+
+def _weekwise_regret(df: pd.DataFrame, candidate: str, feats: List[str]) -> Dict[Any, float]:
+    """Walk-forward, then regret computed per week rather than pooled."""
+    weeks = np.sort(df["date"].unique())
+    out: Dict[Any, float] = {}
+    for w in weeks[MIN_TRAIN_WEEKS:]:
+        tr, te = df[df["date"] < w], df[df["date"] == w]
+        if te.empty or tr["date"].nunique() < MIN_TRAIN_WEEKS:
+            continue
+        if candidate == "persistence":
+            p = predict_persistence(tr, te)
+        elif candidate == "arima":
+            p = predict_arima(tr, te)
+        elif candidate == "ridge":
+            p = predict_ridge(tr, te, feats)
+        else:
+            p = predict_xgb(tr, te, feats)
+        out[w] = asymmetric_regret(te["target_ret"].values, p)
+    return out
+
+
+def seed_sensitivity(df: pd.DataFrame, feats: List[str], seeds=(11, 42, 123, 2024)) -> Dict[str, Any]:
+    """Re-run walk-forward for each candidate under several seeds.
+
+    Reports the observed spread so a headline can be quoted as a range. A single-seed
+    number on 8 test weeks moved by several percent between environments, and quoting
+    one of them as 'the' result overstates what the data supports.
+    """
+    out: Dict[str, List[float]] = {}
+    for cand in ("persistence", "arima", "ridge", "xgb"):
+        vals: List[float] = []
+        for s in seeds:
+            wf = walk_forward(df, feats, MIN_TRAIN_WEEKS, seed=s)
+            vals.append(wf[cand]["metrics"]["asym_regret_logret"])
+        out[cand] = vals
+    summary = {c: {"min": round(min(v), 5), "max": round(max(v), 5),
+                   "spread": round(max(v) - min(v), 5),
+                   "values": [round(x, 5) for x in v]} for c, v in out.items()}
+    return {"seeds": list(seeds), "candidates": summary}
 
 
 def train(min_train_weeks: int = MIN_TRAIN_WEEKS) -> Dict[str, Any]:
@@ -403,39 +509,52 @@ def train(min_train_weeks: int = MIN_TRAIN_WEEKS) -> Dict[str, Any]:
     kept_groups = []
     for g, r in abl["groups"].items():
         if r.get("available"):
-            verdict = "helps" if r["helps"] else "no measurable benefit"
-            print(f"  {g:<12} regret {r['regret_without']:.4f} vs {abl['reference_regret']:.4f} "
-                  f"({verdict})")
+            b = r.get("bootstrap", {})
+            ci = (f" [{b['ci95_low']:+.4f}, {b['ci95_high']:+.4f}]"
+                  if b.get("available") else "")
+            print(f"  {g:<12} regret {r['regret_without']:.4f} vs {abl['reference_regret']:.4f}"
+                  f"{ci} -> {r['verdict']}")
             if r["helps"]:
                 kept_groups.append(g)
         else:
             print(f"  {g:<12} not testable: {r.get('reason')}")
 
-    # Deploy on the groups that demonstrably earned their place.
-    #
-    # This matters because gain-based importance and contribution are different things.
-    # In the run before this one, weather took the top three importance slots and the
-    # ablation showed removing it changed regret by 0.0015, i.e. nothing. Over five
-    # months, rainfall is largely a proxy for the monsoon, and a tree will happily use
-    # it to identify the period. Shipping the full set would mean telling a reviewer
-    # that rain drives freight rates when the data does not support that claim.
+    # Keep a group only if the bootstrap says it helps. Anything inconclusive is
+    # dropped, not kept on the strength of a sign.
     validated = [f for g in kept_groups for f in FEATURE_GROUPS.get(g, []) if f in feats]
     dropped_groups = [g for g in FEATURE_GROUPS if g not in kept_groups]
     if validated and len(validated) < len(feats):
-        print(f"\n[m2] deploying on validated groups {kept_groups}; "
-              f"dropping {dropped_groups}")
+        print(f"\n[m2] keeping validated groups {kept_groups}; "
+              f"dropping {dropped_groups} (no reliable effect)")
         wf = walk_forward(df, validated, min_train_weeks)
         scored = {k: v["metrics"] for k, v in wf.items()}
         feats = validated
     else:
-        print("\n[m2] all groups validated; deploying the full feature set")
+        print("\n[m2] no group showed a reliable effect; deploying on the full feature set "
+              "with that stated")
+
+    # Headline, as a range over seeds, with a significance test against persistence.
+    print("\n[m2] seed sensitivity (regret over 4 seeds):")
+    seeds = seed_sensitivity(df, feats)
+    for c, s in seeds["candidates"].items():
+        print(f"  {c:<12} {s['min']:.4f} - {s['max']:.4f}  (spread {s['spread']:.4f})")
+    pers = seeds["candidates"]["persistence"]
 
     # Winner on asymmetric regret: the objective, not the prettiest metric.
     winner = min(scored, key=lambda k: scored[k]["asym_regret_logret"])
     base = scored["persistence"]["asym_regret_logret"]
     gain = 100 * (1 - scored[winner]["asym_regret_logret"] / base) if base else 0.0
-    print(f"\n[m2] winner: {winner} "
-          f"({gain:+.1f}% regret vs persistence on walk-forward data)")
+    sig = week_level_bootstrap(df, winner, feats, "persistence", feats)
+    print(f"\n[m2] winner: {winner} ({gain:+.1f}% regret vs persistence, single seed)")
+    if sig.get("available"):
+        print(f"[m2] paired bootstrap over {sig['n_weeks']} weeks: regret improvement of "
+              f"{winner} over persistence = {sig['mean_regret_improvement_of_a']:+.4f} "
+              f"(95% CI {sig['ci95_low']:+.4f} to {sig['ci95_high']:+.4f})")
+        print(f"[m2] {sig['verdict']}")
+    # Range of the headline across seeds, so a single number is not over-read.
+    lo_gain = 100 * (1 - seeds["candidates"][winner]["max"] / pers["min"])
+    hi_gain = 100 * (1 - seeds["candidates"][winner]["min"] / pers["max"])
+    print(f"[m2] regret reduction across seeds: {lo_gain:+.1f}% to {hi_gain:+.1f}%")
 
     w = wf[winner]
     calib = conformal_quantiles(w["frame"]["target_ret"].values - w["pred_ret"])
@@ -463,7 +582,7 @@ def train(min_train_weeks: int = MIN_TRAIN_WEEKS) -> Dict[str, Any]:
         tot = sum(gain_map.values()) or 1.0
         feature_importance = {k: round(v / tot, 4) for k, v in
                               sorted(gain_map.items(), key=lambda kv: -kv[1])}
-        final = {"kind": "xgb", "path": str(MODEL_PATH.relative_to(ROOT)),
+        final = {"kind": "xgb", "path": MODEL_PATH.relative_to(ROOT).as_posix(),
                  "feature_importance_gain": feature_importance}
     else:
         final = {"kind": winner, "path": None,
@@ -488,6 +607,14 @@ def train(min_train_weeks: int = MIN_TRAIN_WEEKS) -> Dict[str, Any]:
         "candidates": scored,
         "deployed_model": winner,
         "regret_reduction_vs_persistence_pct": round(gain, 2),
+        "regret_reduction_range_across_seeds_pct": [round(lo_gain, 2), round(hi_gain, 2)],
+        "seed_sensitivity": seeds,
+        "significance_vs_persistence": sig,
+        "headline_caveat": (
+            f"Only {sig.get('n_weeks', 0)} out-of-sample weeks. The regret reduction moves "
+            f"between {lo_gain:.1f}% and {hi_gain:.1f}% across seeds, so quote the range. "
+            f"The ranking (XGBoost ahead of ARIMA, Ridge and persistence) is stable, the "
+            f"margins are not large."),
         "conformal_intervals": calib,
         "regime_check": regime,
         "feature_group_ablation": abl,
@@ -537,7 +664,41 @@ def _write_model_card(m: Dict[str, Any], scored: Dict[str, Any], winner: str) ->
     lines += [
         "",
         f"## Deployed model: `{winner}`",
-        f"Asymmetric regret {m['regret_reduction_vs_persistence_pct']:+.1f}% versus persistence.",
+        f"Asymmetric regret {m['regret_reduction_vs_persistence_pct']:+.1f}% versus "
+        f"persistence on a single seed.",
+        "",
+        "### Is that difference real?",
+        "",
+    ]
+    s = m.get("significance_vs_persistence", {})
+    if s.get("available"):
+        lines += [
+            f"Paired bootstrap over {s['n_weeks']} out-of-sample weeks: regret improvement "
+            f"**{s['mean_regret_improvement_of_a']:+.4f}**, 95% CI "
+            f"[{s['ci95_low']:+.4f}, {s['ci95_high']:+.4f}].",
+            "",
+            f"Verdict: **{s['verdict']}**.",
+        ]
+    else:
+        lines.append(f"Not available: {s.get('reason')}")
+    ss = m.get("seed_sensitivity", {}).get("candidates", {})
+    if ss:
+        rng = m.get("regret_reduction_range_across_seeds_pct")
+        lines += [
+            "",
+            "### Quote this as a range, not a point",
+            "",
+            f"Across {len(m.get('seed_sensitivity', {}).get('seeds', []))} seeds the regret "
+            f"reduction is **{rng[0]:+.1f}% to {rng[1]:+.1f}%**.",
+            "",
+            "| candidate | regret range across seeds | spread |",
+            "|---|---|---|",
+        ]
+        for c, v in ss.items():
+            lines.append(f"| {c} | {v['min']:.4f} to {v['max']:.4f} | {v['spread']:.4f} |")
+    lines += [
+        "",
+        m.get("headline_caveat", ""),
         "",
         "## Intervals",
         "Conformal, from walk-forward residuals, with the upper band widened for the "
@@ -551,33 +712,39 @@ def _write_model_card(m: Dict[str, Any], scored: Dict[str, Any], winner: str) ->
     abl = m.get("feature_group_ablation", {})
     lines += ["", "## Feature-group ablation", "",
               f"Reference: `{abl.get('reference_candidate')}` at regret "
-              f"{abl.get('reference_regret')}. {abl.get('note')}.", "",
-              "| group | regret without it | delta | verdict |", "|---|---|---|---|"]
+              f"{abl.get('reference_regret')}.", "",
+              abl.get("note", ""), "",
+              "| group | regret without it | 95% CI on the difference | verdict |",
+              "|---|---|---|---|"]
     for g, r in (abl.get("groups") or {}).items():
         if r.get("available"):
-            lines.append(f"| {g} | {r['regret_without']:.4f} | {r['regret_delta']:+.4f} | "
-                         f"{'helps' if r['helps'] else 'no measurable benefit'} |")
+            b = r.get("bootstrap", {})
+            ci = (f"[{b['ci95_low']:+.4f}, {b['ci95_high']:+.4f}]"
+                  if b.get("available") else "n/a")
+            lines.append(f"| {g} | {r['regret_without']:.4f} | {ci} | {r['verdict']} |")
         else:
             lines.append(f"| {g} | - | - | not testable: {r.get('reason')} |")
     kept = m.get("features", [])
     dropped = m.get("features_available_but_not_validated", [])
-    lines += ["",
-              (f"**The deployed model uses only: {', '.join(kept)}.**"
-               if kept and dropped else
-               "All groups validated, so the deployed model uses the full feature set."),
-              ""]
     if dropped:
         lines += [
-            f"Groups **{', '.join(dropped)}** are excluded from the deployed model. Feature "
-            "importance ranked weather at the top, but removing it changed regret by "
-            "roughly 0.001, i.e. not at all. Over five months rainfall is largely a proxy "
-            "for the monsoon, and a tree will use it to identify the period rather than to "
-            "explain a rate. Importance is not contribution, and this is the difference "
-            "between the two.",
-            ""]
+            "",
+            f"Features **excluded** from the deployed model: {', '.join(dropped)}.",
+        ]
+    else:
+        lines += [
+            "",
+            f"**No feature group showed a reliable effect, so none was excluded and the "
+            f"deployed model uses the full set ({len(kept)} features).** An earlier version "
+            f"of this analysis pruned the feature list to momentum alone on a point "
+            f"estimate of about 0.002. With a bootstrap noise floor that difference is not "
+            f"separable from zero, so the pruning claim was withdrawn rather than defended.",
+        ]
     lines += [
-        "A group that shows no measurable benefit is not evidence of a driver. It is "
-        "evidence that the model found another way to reach the same answer.",
+        "",
+        "The practical reading: the only finding that survives a noise floor is that a "
+        "fitted model beats persistence. Which features produce that is not established "
+        "on 8 out-of-sample weeks, and should not be asserted to a reviewer.",
         ""]
     rc = m["regime_check"]
     lines += ["", "## Regime robustness", ""]

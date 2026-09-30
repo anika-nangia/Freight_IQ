@@ -1,8 +1,15 @@
 {
-  "built_at": "2026-09-30T07:13:39+00:00",
-  "training_rows": 1608,
-  "rows_before_filter": 1608,
-  "ports": 13,
+  "built_at": "2026-09-30T09:21:21+00:00",
+  "target": "estimated_port_stay_days",
+  "target_definition": "etc_or_etcd minus arrival_or_eta, read at the first snapshot where the vessel is recorded as Working and its arrival date has passed",
+  "target_is_an_estimate": true,
+  "why_it_is_an_estimate": "The line-up data contains no actual completion, departure or sailing field. Status values are only Expected / Waiting / Waiting & Expected / Working, so no voyage is ever recorded as finished. The target is therefore the port's own published schedule, not a measured turnaround. This model predicts the port's estimate.",
+  "no_realised_turnaround_available": true,
+  "rows": 347,
+  "voyages_with_etcd_total": 674,
+  "voyages_kept": 347,
+  "voyages_dropped_not_yet_berthed_or_arrival_is_eta": 327,
+  "ports": 10,
   "snapshot_dates": [
     "2026-08-10",
     "2026-08-11",
@@ -30,120 +37,87 @@
     "working_export",
     "cargo_tonnage",
     "weather_wind_max_kt",
-    "weather_precip_mm",
-    "weather_gale_days"
+    "weather_precip_mm"
   ],
-  "target": "turnaround_days = ETCD - arrival, observed per vessel",
+  "weather_available": true,
+  "split_integrity": {
+    "train_voyages": 268,
+    "test_voyages": 79,
+    "voyage_overlap": 0,
+    "test_dates": [
+      "2026-08-26",
+      "2026-08-27",
+      "2026-08-31"
+    ]
+  },
   "target_stats": {
-    "count": 1608.0,
-    "mean": 4.779,
-    "std": 4.682,
+    "count": 347.0,
+    "mean": 4.78,
+    "std": 4.46,
     "min": 0.0,
     "25%": 2.0,
     "50%": 4.0,
-    "75%": 6.0,
-    "max": 95.0
+    "75%": 5.0,
+    "max": 35.0
   },
-  "weather_available": true,
   "per_port": [
     {
-      "port": "CHENNAI",
-      "snapshots": 12,
-      "mean_queue": 0.83,
-      "max_queue": 3,
-      "mean_occupancy": 0.08
-    },
-    {
-      "port": "DHAMRA",
-      "snapshots": 12,
-      "mean_queue": 5.5,
-      "max_queue": 8,
-      "mean_occupancy": 0.42
-    },
-    {
-      "port": "ENNORE",
-      "snapshots": 12,
-      "mean_queue": 3.83,
-      "max_queue": 7,
-      "mean_occupancy": 0.53
-    },
-    {
-      "port": "GANGAVARAM",
-      "snapshots": 12,
-      "mean_queue": 0.42,
-      "max_queue": 1,
-      "mean_occupancy": 0.28
-    },
-    {
-      "port": "GOPALPUR",
-      "snapshots": 12,
-      "mean_queue": 0.33,
-      "max_queue": 1,
-      "mean_occupancy": 0.33
-    },
-    {
-      "port": "HALDIA",
-      "snapshots": 12,
-      "mean_queue": 3.0,
-      "max_queue": 5,
-      "mean_occupancy": 0.31
-    },
-    {
-      "port": "KAKINADA",
-      "snapshots": 12,
-      "mean_queue": 5.5,
-      "max_queue": 9,
-      "mean_occupancy": NaN
-    },
-    {
-      "port": "KARAIKAL",
-      "snapshots": 12,
-      "mean_queue": 0.0,
-      "max_queue": 0,
-      "mean_occupancy": 0.27
-    },
-    {
-      "port": "KATTUPALLI",
-      "snapshots": 10,
-      "mean_queue": 0.0,
-      "max_queue": 0,
-      "mean_occupancy": 0.5
+      "port": "VISAKHAPATNAM",
+      "voyages": 111,
+      "median_days": 4.0
     },
     {
       "port": "KRISHNAPATNAM",
-      "snapshots": 12,
-      "mean_queue": 2.17,
-      "max_queue": 6,
-      "mean_occupancy": 0.71
+      "voyages": 64,
+      "median_days": 4.0
     },
     {
-      "port": "PARADIP",
-      "snapshots": 12,
-      "mean_queue": 0.0,
-      "max_queue": 0,
-      "mean_occupancy": NaN
+      "port": "HALDIA",
+      "voyages": 37,
+      "median_days": 3.0
     },
     {
-      "port": "SAGAR",
-      "snapshots": 12,
-      "mean_queue": 0.17,
-      "max_queue": 2,
-      "mean_occupancy": NaN
+      "port": "DHAMRA",
+      "voyages": 35,
+      "median_days": 7.0
     },
     {
-      "port": "VISAKHAPATNAM",
-      "snapshots": 12,
-      "mean_queue": 8.92,
-      "max_queue": 12,
-      "mean_occupancy": 0.47
+      "port": "GANGAVARAM",
+      "voyages": 33,
+      "median_days": 3.0
+    },
+    {
+      "port": "ENNORE",
+      "voyages": 33,
+      "median_days": 3.0
+    },
+    {
+      "port": "CHENNAI",
+      "voyages": 19,
+      "median_days": 2.0
+    },
+    {
+      "port": "KARAIKAL",
+      "voyages": 8,
+      "median_days": 3.5
+    },
+    {
+      "port": "GOPALPUR",
+      "voyages": 5,
+      "median_days": 4.0
+    },
+    {
+      "port": "KATTUPALLI",
+      "voyages": 2,
+      "median_days": 4.0
     }
   ],
   "provenance_tier": "observed",
-  "ports_with_turnaround_observations": 11,
   "known_limitations": [
-    "Snapshots cover August 2026 only: 12 trading days, 14 ports. A walk-forward test on this is a handful of folds and should be read as a sanity check, not a performance claim.",
-    "A vessel's turnaround is only known once it has discharged, so the newest snapshots are under-represented among completed voyages. The chronological split accounts for this by testing only on the latest dates.",
-    "berths_total is inferred from distinct berth names seen in the line-up, because berth_operations.csv contains only 'Vacant' rows and therefore cannot supply a capacity denominator. Ports whose report omits berth names (Paradip among them) have no occupancy figure, so it is imputed and the score leans on queue length instead.",
-    "'Waiting & Expected' is split into 'arrived and waiting' and 'not yet arrived'. Some ports list every vessel under that single status, so counting it verbatim produced a queue of 40 against zero berthed vessels at Paradip. Only vessels with an arrival date on or before the snapshot are counted as queued."
+    "The target is the port's ESTIMATE of port stay. No actual completion time exists in the source data, so realised turnaround cannot be modelled at all.",
+    "Because the target is the port's own schedule, a good score partly reflects the port's queue-management behaviour rather than independent information.",
+    "111 of 347 voyages (32%) are one port, so the effective sample is far smaller than the row count suggests.",
+    "12 snapshot dates in August 2026. A 3-date holdout is a handful of voyages and cannot support a performance claim.",
+    "berths_total is inferred from distinct berth names in the line-up; ports whose report omits berth names have no occupancy figure and it is imputed."
   ]
 }
