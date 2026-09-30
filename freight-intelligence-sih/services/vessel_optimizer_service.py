@@ -272,13 +272,10 @@ class VesselOptimizerService:
                     typ_draft = _parse_number(s.get("draft_typical"))
             if lim_draft is not None and typ_draft is not None and typ_draft > lim_draft:
                 conflict = (
-                    f"{dest['port'] if dest else origin} publishes a "
-                    f"{lim_draft} m draft limit but also declares {smallest_admitted} as its "
-                    f"largest admitted class, and the {smallest_admitted} class reference "
-                    f"draft is {typ_draft} m. A class TYPICAL draft is not a berth limit, so "
-                    f"the published class is used for admissibility and the numeric limits "
-                    f"apply to anything larger. Confirm against the port's notice to "
-                    f"charterers before fixing.")
+                    f"{dest['port'] if dest else origin} publishes a {lim_draft} m draft "
+                    f"limit, but also lists {smallest_admitted} as its largest class, and a "
+                    f"{smallest_admitted} typically draws {typ_draft} m. We went with the "
+                    f"published class. Check the port's notice to charterers before fixing.")
 
         effective: Dict[str, Any] = {"origin": origin_limits, "origin_kind": origin_kind,
                                       "origin_verified": origin_limits is not None,
@@ -381,17 +378,15 @@ class VesselOptimizerService:
 
         out: Dict[str, Any] = {
             "available": bool(recommended),
-            "ranking_basis": ("expected margin per voyage (Model 2 revenue vs charter + "
-                              "dues + Model 1 waiting cost)"
+            "ranking_basis": ("expected profit for the voyage"
                               if margin.get("available")
-                              else "cost per tonne only - no rate forecast available for "
-                                   "this corridor, so margin could not be computed"),
+                              else "cost per tonne only - no rate forecast for this "
+                                   "corridor, so profit could not be worked out"),
             "origin": origin_name,
             "origin_limits_verified": origin_verified,
             "origin_warning": (None if origin_verified else
-                               f"no berth limits on file for origin '{origin}'. Feasibility was "
-                               f"checked against the destination port only, so a vessel may be "
-                               f"recommended that the origin cannot accept."),
+                               f"No berth limits on file for {origin}, so we only checked "
+                               f"the discharge port. She may not be able to load there."),
             "destination": dest["port"] if dest else destination,
             "destination_limits_verified": dest is not None,
             "cargo_volume_mt": cargo_volume_mt,

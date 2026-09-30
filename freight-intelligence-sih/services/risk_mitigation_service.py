@@ -115,20 +115,18 @@ class RiskMonitorService:
             })
             if direction == "rising":
                 reasons.append(
-                    f"Model 2 projects the rate up to "
-                    f"{forecast.get('forecast_rate_usd_mt')} USD/MT from "
-                    f"{forecast.get('current_observed_rate_usd_mt')} "
-                    f"({_signed_pct(forecast)}%), which is {strength:.0%} of the model's "
-                    f"own uncertainty band.")
+                    f"Rate forecast up to {forecast.get('forecast_rate_usd_mt')} "
+                    f"USD/tonne ({_signed_pct(forecast)}%), a big enough move "
+                    f"({strength:.0%} of the error bar) to act on.")
             elif direction == "falling":
                 reasons.append(
-                    f"Model 2 projects the rate down to "
-                    f"{forecast.get('forecast_rate_usd_mt')} USD/MT "
-                    f"({_signed_pct(forecast)}%), {strength:.0%} of the uncertainty band.")
+                    f"Rate forecast down to {forecast.get('forecast_rate_usd_mt')} "
+                    f"USD/tonne ({_signed_pct(forecast)}%), a big enough move "
+                    f"({strength:.0%} of the error bar) to act on.")
             else:
                 reasons.append(
-                    f"Model 2's move ({_signed_pct(forecast)}%) sits inside its own "
-                    f"uncertainty band, so it gives no directional signal.")
+                    f"Rate moves {_signed_pct(forecast)}%, but that is inside the range "
+                    f"our error bars allow, so there is no clear signal either way.")
 
         # ------------------------------------------------------- Model 1 signal
         congestion_score, turnaround, queue, cat = _read_congestion(congestion)
@@ -149,15 +147,14 @@ class RiskMonitorService:
             })
             if (congestion_score or 0) >= THRESHOLDS["congestion_critical"]:
                 reasons.append(
-                    f"Model 1 puts {port} at critical congestion: {queue} vessels at "
-                    f"anchor and a modelled port stay of up to {turnaround} days.")
+                    f"{port} is critically congested: {queue} vessels at anchor, and a "
+                    f"ship could take up to {turnaround} days to get in.")
             elif (congestion_score or 0) >= THRESHOLDS["congestion_high"]:
                 reasons.append(
-                    f"Model 1 shows {queue} vessels waiting at {port}, so a committed "
-                    f"vessel queues rather than berths on arrival.")
+                    f"{queue} vessels are waiting at {port}, so a committed ship queues "
+                    f"instead of berthing on arrival.")
             else:
-                reasons.append(
-                    f"Model 1 shows {port} operating normally ({cat}, {queue} waiting).")
+                reasons.append(f"{port} is quiet, with {queue} waiting.")
 
         # --------------------------------------------------------- weather signal
         wind = _num(_first(weather, "wind_max_kt", "weather_wind_max_kt"))
@@ -217,12 +214,14 @@ class RiskMonitorService:
             "drivers": drivers,
             "inputs": inputs,
             "missing_inputs": missing,
-            "model_coverage": f"{len(drivers)} of 3 input families present "
-                              f"(freight forecast, congestion, weather)",
+            "model_coverage": f"{len(drivers)} of 3 inputs available "
+                              f"(rate, port, weather)",
             "headline": _headline(port, action, avoid_adding, drivers),
             "confidence": confidence,
             "mitigations": _mitigations(action, avoid_adding, turnaround, weather_band),
             "thresholds": THRESHOLDS,
+            # Kept in the response for audit, but it is a methodology note, not
+            # something to print under a card on the page.
             "threshold_basis": "Operational policy: IMD cyclone wind categories for wind, "
                                "and a policy band for berth congestion. Not fitted "
                                "parameters. The signal threshold is derived from each "

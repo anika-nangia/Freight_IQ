@@ -1430,7 +1430,7 @@ function renderRecommendationsView() {
           <div class="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200/80 flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-bold uppercase tracking-wider text-blue-700">1. Optimal Market Entry</span>
+                <span class="text-xs font-bold uppercase tracking-wider text-blue-700">1. When to Book</span>
                 <span id="marketEntryBadge" class="text-[11px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Connecting&hellip;</span>
               </div>
               <p id="marketEntryWhy" class="text-xs text-slate-700 leading-relaxed">&nbsp;</p>
@@ -1444,7 +1444,7 @@ function renderRecommendationsView() {
           <div class="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200/80 flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">2. Vessel Optimizer</span>
+                <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">2. Which Ship</span>
                 <span id="vesselBadge" class="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">Connecting&hellip;</span>
               </div>
               <p id="vesselWhy" class="text-xs text-slate-700 leading-relaxed">&nbsp;</p>
@@ -1458,7 +1458,7 @@ function renderRecommendationsView() {
           <div class="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200/80 flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-bold uppercase tracking-wider text-amber-800">3. Risk Monitor</span>
+                <span class="text-xs font-bold uppercase tracking-wider text-amber-800">3. What Could Go Wrong</span>
                 <span id="riskBadge" class="text-[11px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded">Connecting&hellip;</span>
               </div>
               <p id="riskWhy" class="text-xs text-slate-700 leading-relaxed">&nbsp;</p>
