@@ -3702,9 +3702,6 @@ function renderInfraConstraintsView() {
   const p1 = getIndianPortObj(selectedInfraOrigin);
   const p2 = getIntlPortObj(selectedInfraDest);
 
-  const minDraft = Math.min(p1.max_draft_m, p2.max_draft_m);
-  const minLoa = Math.min(p1.max_loa_m, p2.max_loa_m);
-
   const filteredIndian = portConstraintsData.filter(p => 
     !infraSearchQuery || 
     p.port_name.toLowerCase().includes(infraSearchQuery.toLowerCase()) || 
@@ -3781,117 +3778,6 @@ function renderInfraConstraintsView() {
           </div>
 
         </div>
-      </div>
-
-      <!-- SIDE-BY-SIDE PARAMETER COMPARISON CARDS (LOA & DRAFT ONLY) -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        
-        <!-- CARD 1: LOA (LENGTH OVERALL) COMPARISON -->
-        <div class="card-elevation bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between mb-4">
-              <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m0 0h4m-4 0V11m0 0H9m3 0h3m-3 0v4m0 0H9m3 0h3"/></svg>
-                </div>
-                <h3 class="font-bold text-slate-900 font-outfit text-base">LOA (Length Overall) Comparison</h3>
-              </div>
-              <span class="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded-full border border-emerald-200">
-                Max LOA: ${minLoa}m
-              </span>
-            </div>
-
-            <!-- Visual Bar Comparison for LOA -->
-            <div class="space-y-4 my-4">
-              <!-- Port 1 LOA Bar -->
-              <div>
-                <div class="flex justify-between text-xs font-semibold mb-1">
-                  <span class="text-slate-700">${p1.port_name} (Port 1)</span>
-                  <span class="text-cyan-700 font-extrabold">${p1.max_loa_m} m</span>
-                </div>
-                <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div class="h-full bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full transition-all duration-500" style="width: ${Math.min(100, (p1.max_loa_m / 380) * 100)}%;"></div>
-                </div>
-              </div>
-
-              <!-- Port 2 LOA Bar -->
-              <div>
-                <div class="flex justify-between text-xs font-semibold mb-1">
-                  <span class="text-slate-700">${p2.port_name} (Port 2)</span>
-                  <span class="text-emerald-700 font-extrabold">${p2.max_loa_m} m</span>
-                </div>
-                <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full transition-all duration-500" style="width: ${Math.min(100, (p2.max_loa_m / 380) * 100)}%;"></div>
-                </div>
-              </div>
-
-              <!-- Typical Vessel Class Threshold Marker -->
-              <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-500 flex justify-between">
-                <span>Capesize LOA (~290m)</span>
-                <span>Panamax LOA (~225m)</span>
-                <span>Supramax LOA (~190m)</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-600 mt-2">
-            <strong>LOA Verdict:</strong> ${p1.max_loa_m < p2.max_loa_m ? `${p1.port_name} has a tighter LOA constraint (${p1.max_loa_m}m) than ${p2.port_name} (${p2.max_loa_m}m).` : (p2.max_loa_m < p1.max_loa_m ? `${p2.port_name} has a tighter LOA constraint (${p2.max_loa_m}m) than ${p1.port_name} (${p1.max_loa_m}m).` : `Both ports offer equal LOA clearance of ${p1.max_loa_m}m.`)}
-          </div>
-        </div>
-
-        <!-- CARD 2: DRAFT LIMIT COMPARISON -->
-        <div class="card-elevation bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between mb-4">
-              <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center font-bold">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
-                </div>
-                <h3 class="font-bold text-slate-900 font-outfit text-base">Draft Limit & Depth Gauge</h3>
-              </div>
-              <span class="text-xs bg-cyan-50 text-cyan-700 font-semibold px-2.5 py-1 rounded-full border border-cyan-200">
-                Governing Draft: ${minDraft}m
-              </span>
-            </div>
-
-            <!-- Visual Depth Gauge for Draft -->
-            <div class="space-y-4 my-4">
-              <!-- Port 1 Draft Bar -->
-              <div>
-                <div class="flex justify-between text-xs font-semibold mb-1">
-                  <span class="text-slate-700">${p1.port_name} Max Draft</span>
-                  <span class="${p1.max_draft_m < 12 ? 'text-rose-600' : 'text-cyan-700'} font-extrabold">${p1.max_draft_m} m ${p1.tide_restriction ? '(Tide Restricted)' : ''}</span>
-                </div>
-                <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div class="h-full ${p1.max_draft_m < 12 ? 'bg-gradient-to-r from-rose-500 to-amber-500' : 'bg-gradient-to-r from-blue-500 to-cyan-500'} rounded-full transition-all duration-500" style="width: ${Math.min(100, (p1.max_draft_m / 22) * 100)}%;"></div>
-                </div>
-              </div>
-
-              <!-- Port 2 Draft Bar -->
-              <div>
-                <div class="flex justify-between text-xs font-semibold mb-1">
-                  <span class="text-slate-700">${p2.port_name} Max Draft</span>
-                  <span class="${p2.max_draft_m < 12 ? 'text-rose-600' : 'text-emerald-700'} font-extrabold">${p2.max_draft_m} m</span>
-                </div>
-                <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div class="h-full ${p2.max_draft_m < 12 ? 'bg-gradient-to-r from-amber-500 to-rose-500' : 'bg-gradient-to-r from-emerald-500 to-teal-500'} rounded-full transition-all duration-500" style="width: ${Math.min(100, (p2.max_draft_m / 22) * 100)}%;"></div>
-                </div>
-              </div>
-
-              <!-- Draft Reference Markers -->
-              <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-500 flex justify-between">
-                <span>Shallow (<10m)</span>
-                <span>Panamax Draft (~13.5m)</span>
-                <span>Deepwater (>16m)</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-600 mt-2">
-            <strong>Draft Verdict:</strong> ${p1.max_draft_m < p2.max_draft_m ? `${p1.port_name} restricts channel draft to ${p1.max_draft_m}m.` : (p2.max_draft_m < p1.max_draft_m ? `${p2.port_name} governs route draft at ${p2.max_draft_m}m.` : `Both ports support a draft of ${p1.max_draft_m}m.`)} ${p1.tide_restriction ? 'Requires high-tide navigation window.' : ''}
-          </div>
-        </div>
-
       </div>
 
       <!-- FULL DATASET MATRIX EXPLORER TABLE (port_constraints & international-loading-ports) -->
@@ -4015,4 +3901,3 @@ function renderInfraConstraintsView() {
     </div>
   `;
 }
-
