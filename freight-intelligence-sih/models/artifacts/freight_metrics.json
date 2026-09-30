@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-09-30T10:19:48+00:00",
+  "trained_at": "2026-09-30T14:11:55+00:00",
   "validation_scheme": "walk-forward refit every week, min 12 training weeks, scored on the unseen week only",
   "target": "log(rate[t+2w] / rate[t])",
   "loss": "asymmetric, alpha=2.5 under-forecast / beta=1.0 over-forecast",

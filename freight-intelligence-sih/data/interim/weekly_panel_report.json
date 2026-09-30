@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-09-30T09:21:21+00:00",
+  "built_at": "2026-09-30T14:06:27+00:00",
   "rows_raw": 286,
   "rows_usable": 220,
   "lanes": 11,
@@ -135,7 +135,7 @@
       "mean_rate": 18.33
     }
   ],
-  "provenance_tier": "observed",
+  "provenance_tier": "unverified",
   "excluded_features": {
     "month_sin, month_cos": "Only ~26 weeks of history, so they act as a time index rather than seasonality and the model memorised them."
   }
