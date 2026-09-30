@@ -1229,7 +1229,7 @@ function renderDualForecastView() {
             Corridor Telemetry &amp; Model Forecast
           </span>
           <h2 class="text-2xl font-bold text-slate-900 mt-2 font-outfit">
-            Observed Freight Rates with Model Forecast
+            Observed Freight Rates
           </h2>
           <p class="text-xs text-slate-500 mt-1">
             Each point is a recorded weekly rate. The forecast is the deployed model's

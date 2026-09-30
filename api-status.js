@@ -791,7 +791,7 @@
         }
 
         var t = document.getElementById("chartTitle");
-        if (t) t.textContent = "Observed Weekly Rates & Model Forecast \u2014 " + chosen.corridor_id;
+        if (t) t.textContent = "Observed Freight Rates \u2014 " + chosen.corridor_id;
         var sub = document.getElementById("chartSubtitle");
         if (sub && s && s.observed && s.observed.available) {
           sub.textContent = s.observed.weeks + " recorded weeks, " +
