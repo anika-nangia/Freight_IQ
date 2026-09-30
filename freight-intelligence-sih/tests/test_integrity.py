@@ -214,7 +214,7 @@ def test_congestion_metrics_are_computed_not_hardcoded():
 def test_congestion_records_the_library_version_it_was_fitted_with():
     """A pickled estimator is version-coupled; the version must travel with it."""
     import pickle
-    with (ROOT / "models" / "artifacts" / "congestion_model.json").open("rb") as fh:
+    with (ROOT / "models" / "artifacts" / "congestion_model.pkl").open("rb") as fh:
         art = pickle.load(fh)
     assert art.get("sklearn_version"), "artifact does not record the sklearn version"
     m = json.loads(CONGESTION_METRICS.read_text(encoding="utf-8"))

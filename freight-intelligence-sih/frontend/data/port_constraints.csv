@@ -1,8 +1,0 @@
-port_id,port_name,state,latitude,longitude,max_draft_m,max_loa_m,max_beam_m,num_berths,crane_handling_tph,tide_restriction,max_vessel_class,typical_throughput_mt
-paradip,Paradip,Odisha,20.316,86.611,14.5,295.0,45.0,18,25000,False,Capesize,138
-visakhapatnam,Visakhapatnam,Andhra Pradesh,17.686,83.218,18.0,320.0,48.0,26,22000,False,Capesize,72
-haldia,Haldia,West Bengal,22.028,88.068,8.5,210.0,31.0,24,9000,True,Handysize,42
-dhamra,Dhamra,Odisha,20.762,86.903,17.0,300.0,46.0,8,24000,False,Capesize,35
-gangavaram,Gangavaram,Andhra Pradesh,17.633,83.221,21.0,350.0,52.0,10,26000,False,Capesize,58
-gopalpur,Gopalpur,Odisha,19.267,84.900,9.0,185.0,28.0,4,8000,False,Handymax,8
-sagar,Sagar & Sandheads,West Bengal,21.650,88.100,9.5,230.0,32.0,6,10000,True,Panamax,12

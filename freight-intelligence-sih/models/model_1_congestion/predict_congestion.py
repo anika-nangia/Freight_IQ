@@ -32,7 +32,7 @@ sys.path.insert(0, str(ROOT))
 from data_pipeline import provenance as prov  # noqa: E402
 
 ART = ROOT / "models" / "artifacts"
-MODEL_PATH = ART / "congestion_model.json"
+MODEL_PATH = ART / "congestion_model.pkl"
 METRICS_PATH = ART / "congestion_metrics.json"
 SNAPSHOTS = ROOT / "data" / "interim" / "port_congestion_snapshots.csv"
 DATASET = ROOT / "data" / "interim" / "congestion_dataset.csv"

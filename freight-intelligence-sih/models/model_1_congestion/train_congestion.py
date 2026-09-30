@@ -40,7 +40,7 @@ sys.path.insert(0, str(ROOT))
 
 DATASET = ROOT / "data" / "interim" / "congestion_dataset.csv"
 ART = ROOT / "models" / "artifacts"
-MODEL_PATH = ART / "congestion_model.json"
+MODEL_PATH = ART / "congestion_model.pkl"
 METRICS_PATH = ART / "congestion_metrics.json"
 CARD_PATH = ART / "congestion_model_card.md"
 

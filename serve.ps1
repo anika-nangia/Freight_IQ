@@ -1,5 +1,9 @@
 # Simple native PowerShell HTTP Server for FreightIQ (zero dependencies required)
-param([int]$Port = 3000)
+#
+# Also proxies /api/* to the FastAPI backend (default 127.0.0.1:8000) so the page and
+# the API share an origin. Without this the browser blocks the API call from the static
+# server, and opening index.html as file:// blocks it for the same reason.
+param([int]$Port = 3000, [string]$ApiTarget = "http://127.0.0.1:8000")
 
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$Port/")
@@ -17,10 +21,40 @@ try {
         $response = $context.Response
         
         $localPath = $request.Url.LocalPath.TrimStart('/')
+
+        # --- Proxy /api/* to the FastAPI backend ---------------------------
+        if ($localPath.StartsWith("api/") -or $localPath -eq "api") {
+            try {
+                $uri = "$ApiTarget/$($request.Url.LocalPath.TrimStart('/'))"
+                if ($request.Url.Query) { $uri = "$uri`?$($request.Url.Query)" }
+                $proxy = [System.Net.WebRequest]::Create($uri)
+                $proxy.Method = $request.HttpMethod
+                $resp = $proxy.GetResponse()
+                $response.StatusCode = [int]$resp.StatusCode
+                $response.ContentType = $resp.ContentType
+                $stream = $resp.GetResponseStream()
+                $buf = New-Object byte[] 8192
+                while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) {
+                    $response.OutputStream.Write($buf, 0, $n)
+                }
+                $resp.Close()
+            } catch {
+                # Backend not running. Return a clear, parseable error so the page can
+                # show its offline notice instead of a blank panel.
+                $response.StatusCode = 503
+                $response.ContentType = "application/json"
+                $err = [System.Text.Encoding]::UTF8.GetBytes(
+                    '{"detail":"FreightIQ API is not running. Start it with: uvicorn backend.main:app --app-dir freight-intelligence-sih"}')
+                $response.OutputStream.Write($err, 0, $err.Length)
+            }
+            $response.Close()
+            continue
+        }
+
         if ([string]::IsNullOrEmpty($localPath) -or $localPath -eq "") {
             $localPath = "index.html"
         }
-        
+
         $filePath = Join-Path $PSScriptRoot $localPath
         if (Test-Path $filePath -PathType Leaf) {
             $bytes = [System.IO.File]::ReadAllBytes($filePath)
