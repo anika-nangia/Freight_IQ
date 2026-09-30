@@ -693,15 +693,6 @@ function initEventListeners() {
   // Form input change handlers
   document.getElementById("originSelect")?.addEventListener("change", handleFormChange);
   document.getElementById("destSelect")?.addEventListener("change", handleFormChange);
-  document.getElementById("vesselTypeSelect")?.addEventListener("change", (e) => {
-    const vtype = e.target.value;
-    state.query.vesselType = vtype;
-    document.querySelectorAll(".chip-btn").forEach((c) => {
-      if (c.dataset.vessel === vtype) c.classList.add("active");
-      else c.classList.remove("active");
-    });
-    handleFormChange();
-  });
 
   // Check Infrastructure Constraints Button (Directs to Infrastructure Constraints comparison screen)
   document.getElementById("checkPriceBtn")?.addEventListener("click", (e) => {

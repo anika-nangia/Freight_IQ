@@ -284,6 +284,7 @@
                 <!-- Column 2: To Destination Port -->
                 <div class="md:col-span-3 bg-white text-slate-900 p-3 rounded-xl flex flex-col justify-center shadow-xs">
                   <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">To</label>
+
                   <select id="destSelect" class="auth-guarded-input bg-transparent text-sm font-bold text-slate-800 w-full focus:outline-none cursor-pointer">
                     <optgroup label="Australia">
                       <option value="Australia &mdash; Newcastle - Kooragang" selected>Australia &mdash; Newcastle - Kooragang</option>
@@ -311,22 +312,8 @@
                   </select>
                 </div>
 
-                <!-- Column 3: Vessel Class. app.js reads #vesselTypeSelect on change and
-                     falls back to state.query.vesselType. The element was missing, so the
-                     vessel class could not be chosen from the UI. -->
-                <div class="md:col-span-2 bg-white text-slate-900 p-3 rounded-xl flex flex-col justify-center shadow-xs">
-                  <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Vessel Class</label>
-                  <select id="vesselTypeSelect" class="auth-guarded-input bg-transparent text-sm font-bold text-slate-800 w-full focus:outline-none cursor-pointer">
-                    <option value="Handysize">Handysize</option>
-                    <option value="Handymax">Handymax</option>
-                    <option value="Supramax" selected>Supramax</option>
-                    <option value="Panamax">Panamax</option>
-                    <option value="Capesize">Capesize</option>
-                  </select>
-                </div>
-
-                <!-- Column 4: Check Infrastructure Constraints Button -->
-                <div class="md:col-span-3 flex items-center">
+                <!-- Column 3: Check Infrastructure Constraints Button -->
+                <div class="md:col-span-5 flex items-center">
                   <button id="checkPriceBtn" type="button" class="w-full h-full min-h-[56px] bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 active:from-blue-900 text-white font-extrabold text-sm px-4 py-3.5 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center font-outfit tracking-wide">
                     Check Infrastructure Constraints
                   </button>
