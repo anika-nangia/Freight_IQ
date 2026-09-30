@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-09-30T09:21:20+00:00",
+  "built_at": "2026-09-30T19:14:43+00:00",
   "rows": 66,
   "corridors": 6,
   "vessel_classes": [
@@ -15,7 +15,7 @@
   "feature_groups_present": {
     "lane_momentum": true,
     "world_bank_commodity": true,
-    "baltic_subindices": false,
+    "baltic_subindices": true,
     "port_weather": true
   },
   "per_lane": [
@@ -108,7 +108,7 @@
       "mean_rate": 19.64
     }
   ],
-  "target_provenance_tier": "observed",
+  "target_provenance_tier": "unverified",
   "known_limitations": [
     "Only 6 monthly points per corridor: a 1-6 month-ahead monthly model cannot be validated on this depth. Short-horizon (weekly) forecasting carries the statistical weight; monthly output is presented as a conditional path, not a fitted monthly model.",
     "Corridors are port-pair level, not terminal level. No per-terminal rate differences are invented.",

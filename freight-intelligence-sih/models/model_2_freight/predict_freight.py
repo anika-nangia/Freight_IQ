@@ -113,6 +113,48 @@ class FreightPredictor:
             })
         return sorted(out, key=lambda x: (x["corridor_id"], x["vessel_class"]))
 
+    def corridor_series(self, origin: str, destination: str, vessel_class: str = "Supramax",
+                       max_weeks: int = 20) -> Dict[str, Any]:
+        """Observed weekly rate history for one lane, for charting.
+
+        This is the raw observed series only - it is what the corridor actually
+        recorded, week by week. It is deliberately NOT smoothed, extended or
+        shaped: a chart that invents the path it is drawing is worse than no
+        chart. The forecast and its interval come from forecast(); this method
+        does not extrapolate at all.
+        """
+        self._load()
+        lane, miss = self._match(origin, destination, vessel_class)
+        if miss is not None or lane is None or lane.empty:
+            return {"available": False,
+                    "reason": (miss or {}).get("reason")
+                              or f"no observed rate history for corridor "
+                                 f"'{origin} -> {destination}' / {vessel_class}"}
+
+        d = lane.sort_values("date")
+        if max_weeks and len(d) > max_weeks:
+            d = d.tail(max_weeks)
+
+        pts = [{"date": r.date.strftime("%Y-%m-%d"),
+                "rate_usd_mt": round(float(r.rate_usd_mt), 2)}
+               for r in d.itertuples()]
+
+        return {
+            "available": True,
+            "corridor_id": str(d["corridor_id"].iloc[-1]),
+            "vessel_class": str(d["vessel_class"].iloc[-1]),
+            "unit": "USD/MT",
+            "frequency": "weekly",
+            "points": pts,
+            "weeks": len(pts),
+            "first_observation": pts[0]["date"] if pts else None,
+            "last_observation": pts[-1]["date"] if pts else None,
+            "min_rate_usd_mt": min(p["rate_usd_mt"] for p in pts) if pts else None,
+            "max_rate_usd_mt": max(p["rate_usd_mt"] for p in pts) if pts else None,
+            "note": "Observed weekly rates as recorded. No smoothing or extrapolation.",
+            "provenance_tier": prov.get("route_rates_weekly").tier,
+        }
+
     def _match(self, origin: str, destination: str, vessel_class: str):
         """Resolve a user query to a lane in the panel, or explain why it cannot be."""
         self._load()

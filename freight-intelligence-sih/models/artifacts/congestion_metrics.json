@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-09-30T13:47:51+00:00",
+  "trained_at": "2026-09-30T19:19:16+00:00",
   "target": "estimated_port_stay_days",
   "target_is_an_estimate": true,
   "target_warning": "The target is the port's own published schedule (etc_or_etcd - arrival), not a measured turnaround. The source line-up data has no actual completion field, so realised turnaround cannot be modelled. This model predicts what the port says, which is a useful cross-check on the port's own estimate but is not independent ground truth.",
@@ -84,7 +84,7 @@
       "mae_days": 2.9926737315342318,
       "rmse_days": 4.1431602479492735,
       "r2": -0.07133755934726294,
-      "bias_days": 0.13248445135005954,
+      "bias_days": 0.13248445135005932,
       "n": 79,
       "mae_ci95": [
         2.399,

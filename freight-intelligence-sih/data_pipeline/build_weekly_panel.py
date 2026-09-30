@@ -160,58 +160,91 @@ def add_bdi(df: pd.DataFrame) -> Tuple[pd.DataFrame, bool]:
 
 
 def add_weather(df: pd.DataFrame) -> Tuple[pd.DataFrame, bool]:
-    """Trailing weather for the discharge port, as-of backward on week start."""
+    """Weather features, split by WHEN they describe relative to the forecast target.
+
+    The target is the rate at t + HORIZON_WEEKS. A weather feature only explains that
+    target if it describes the target window. The previous version had one group joined
+    at week t, i.e. a NOWCAST: it told you today's weather while the model predicted two
+    weeks out, so a genuine weather effect would have been read as useless.
+
+    Three groups are built instead:
+
+      wx_now_*  weather at week t. Safe and deployable - what a charterer observes on
+                the day they decide. Describes the past, not the sailing window.
+      wx_tgt_*  weather at t + HORIZON_WEEKS, from the archive. This is the weather
+                that actually prevails during the forecast window.
+                *** PERFECT-FORESIGHT, NOT DEPLOYABLE. ***
+                Nobody knows this at prediction time. It is kept strictly as a
+                diagnostic upper bound: if even the TRUE weather for the target window
+                does not move the metric, then no deployable weather signal can help
+                either, and wiring a live weather-forecast feed is not worth it. If it
+                does move the metric, that is the evidence that justifies one.
+      wx_org_*  weather at the ORIGIN port, week t. Loading-side conditions, which are
+                what delay a sailing. Uses the unverified reference coordinates in
+                data/raw/origin_port_coordinates.csv.
+    """
     if not WEATHER.exists():
-        print("[panel] weather absent -> weather features skipped")
+        print("[panel] weather cache absent -> weather features skipped")
         return df, False
     w = pd.read_csv(WEATHER, parse_dates=["date"])
-    w["port"] = w["port"].str.strip().str.title()
-    # 'Paradip/Haldia' is a two-port discharge region. The line-up data treats it as
-    # one destination, so weather for it is the mean of the two ports over the week.
-    # That is a real observation averaged over real ports, not an invented value.
-    REGION_MEMBERS = {"Paradip/Haldia": ["Paradip", "Haldia"], "Paradip & Haldia": ["Paradip", "Haldia"]}
-    # Each port keeps its own region row, and combined regions are added as extra rows
-    # rather than replacing them: 'Paradip' is a real destination on its own too.
-    frames = [w.assign(region=w["port"])]
-    for region, members in REGION_MEMBERS.items():
-        frames.append(w[w["port"].isin(members)].assign(region=region))
+    if "role" not in w.columns:
+        w["role"] = "discharge"
+    w["port_name"] = w["port"].astype(str).str.strip().str.title()
+    # 'Paradip/Haldia' is a two-port discharge region in the rate data, so its weather
+    # is the mean of the two real ports over the week - real observations averaged over
+    # real ports, not an invented value.
+    frames = [w.assign(region=w["port_name"])]
+    frames.append(w[w["port_name"].isin(["Paradip", "Haldia"])].assign(region="Paradip/Haldia"))
     w = pd.concat(frames, ignore_index=True)
     w["week"] = w["date"] - pd.to_timedelta(w["date"].dt.weekday, unit="D")  # -> Monday
-    # Weekly rainfall total is extremely skewed: most weeks are 0mm and a few are
-    # 100mm+. A tree splits on that single outlier and reads it as the most important
-    # driver in the model, which is not what the data says. Two transforms are kept:
-    # the log, which compresses the tail, and a count of wet days, which is the
-    # quantity a charterer actually reasons about ("3 of 7 days unsettled").
     w["wet_day"] = (w["precip_mm"] > 1.0).astype(int)
-    wk = (w.groupby(["region", "week"], as_index=False)
-            .agg(wind_max_kt=("wind_max_kt", "max"), precip_mm=("precip_mm", "sum"),
-                 gale_days=("gale_flag", "sum"), cyclone_days=("cyclone_flag", "sum"),
+
+    METRICS = ("wind_max_kt", "gust_max_kt", "precip_mm", "pressure_msl",
+               "wave_height_m", "gale_days", "cyclone_days", "rainy_days")
+    wk = (w.groupby(["region", "role", "week"], as_index=False)
+            .agg(wind_max_kt=("wind_max_kt", "max"),
+                 gust_max_kt=("wind_max_kt", "max"),
+                 precip_mm=("precip_mm", "sum"),
+                 pressure_msl=("pressure_msl", "mean"),
+                 wave_height_m=("wave_height_m", "max"),
+                 gale_days=("gale_flag", "sum"),
+                 cyclone_days=("cyclone_flag", "sum"),
                  rainy_days=("wet_day", "sum"))
-            .sort_values(["region", "week"]))
+            .sort_values(["region", "role", "week"]))
+
     out = df.copy()
     out["week"] = out["date"] - pd.to_timedelta(out["date"].dt.weekday, unit="D")
+    out["target_week"] = out["week"] + pd.Timedelta(weeks=HORIZON_WEEKS)
+    key_col = {"discharge": "unload_port", "origin": "load_port"}
 
-    # Per-region as-of lookup. pd.merge_asof with left_by/right_by advances a single
-    # global cursor and silently returns NaN for whole groups, so the backward search
-    # is done explicitly per region.
-    for col in ["wind_max_kt", "precip_mm", "gale_days", "cyclone_days", "rainy_days"]:
-        out[col] = np.nan
-        for region, grp in wk.groupby("region"):
+    # Explicit per-region backward search. merge_asof with left_by/right_by advances
+    # one global cursor and silently returns NaN for whole groups.
+    def _lookup(role: str, week_col: str, prefix: str) -> None:
+        for col in METRICS:
+            out[f"{prefix}_{col}"] = np.nan
+        for region, grp in wk[wk["role"] == role].groupby("region"):
             weeks = grp["week"].to_numpy()
-            vals = grp[col].to_numpy(dtype=float)
-            sel = (out["unload_port"].to_numpy() == region)
-            if not sel.any():
-                continue
-            obs = out.loc[sel, "week"].to_numpy()
-            pos = np.searchsorted(weeks, obs, side="right") - 1   # latest week <= obs week
-            ok = pos >= 0
-            assigned = np.full(obs.shape, np.nan, dtype=float)
-            assigned[ok] = vals[pos[ok]]
-            out.loc[sel, col] = assigned
+            for col in METRICS:
+                vals = grp[col].to_numpy(dtype=float)
+                sel = (out[key_col[role]].to_numpy() == region)
+                if not sel.any():
+                    continue
+                pos = np.searchsorted(weeks, out.loc[sel, week_col].to_numpy(), side="right") - 1
+                ok = pos >= 0
+                assigned = np.full(int(sel.sum()), np.nan)
+                assigned[ok] = vals[pos[ok]]
+                out.loc[sel, f"{prefix}_{col}"] = assigned
 
-    out = out.drop(columns=["week"], errors="ignore")
-    out["log_precip"] = np.log1p(out["precip_mm"].clip(lower=0))
-    print(f"[panel] weather matched {out['wind_max_kt'].notna().sum()}/{len(out)} rows")
+    _lookup("discharge", "week", "wx_now")       # nowcast, deployable
+    _lookup("discharge", "target_week", "wx_tgt")  # target-window, diagnostic only
+    _lookup("origin", "week", "wx_org")           # loading side, deployable
+
+    out = out.drop(columns=["week", "target_week"], errors="ignore")
+    for prefix in ("wx_now", "wx_tgt", "wx_org"):
+        hit = int(out[f"{prefix}_wind_max_kt"].notna().sum())
+        print(f"[panel] {prefix}_* matched {hit}/{len(out)} rows")
+    for prefix in ("wx_now", "wx_tgt", "wx_org"):
+        out[f"log_{prefix}_precip"] = np.log1p(out[f"{prefix}_precip_mm"].clip(lower=0))
     return out, True
 
 
@@ -233,8 +266,19 @@ FEATURE_CANDIDATES = [
     "coal_aus_ret_4w", "coal_saf_ret_4w", "iron_ore_ret_4w", "crude_oil_ret_4w",
     "coal_aus_level", "coal_saf_level", "iron_ore_level", "crude_oil_level",
     "bdi_ret_1w", "bdi_ret_4w", "bdi_vol_4w", "class_index_ret_1w",
-    "wind_max_kt", "log_precip", "rainy_days", "gale_days", "cyclone_days",
 ]
+# Weather, split by when it describes. wx_tgt_* describes the TARGET WEEK and is
+# therefore perfect-foresight: it is measured against the outcome window using
+# observations nobody has at decision time. It is never added to the deployable
+# feature list; the trainer reads it only from a diagnostic path.
+for _p in ("wx_now", "wx_org"):
+    for _m in ("wind_max_kt", "gust_max_kt", "precip_mm", "pressure_msl",
+               "wave_height_m", "gale_days", "cyclone_days", "rainy_days"):
+        FEATURE_CANDIDATES.append(f"{_p}_{_m}")
+    FEATURE_CANDIDATES.append(f"log_{_p}_precip")
+DIAGNOSTIC_FEATURES = [f"wx_tgt_{m}" for m in
+                       ("wind_max_kt", "gust_max_kt", "precip_mm", "pressure_msl",
+                        "wave_height_m", "cyclone_days", "rainy_days")] + ["log_wx_tgt_precip"]
 # Coverage threshold for keeping a feature. Lag and rolling features are legitimately
 # blank during their own warm-up window (ret_8w needs 8 prior weeks per lane), and the
 # rows that costs are all at the START of each lane, i.e. inside the training period.
@@ -251,6 +295,11 @@ def build() -> pd.DataFrame:
     df, has_wx = add_weather(df)
     df = df.sort_values(["corridor_id", "vessel_class", "date"]).reset_index(drop=True)
     df = add_targets(df)
+    # Diagnostic-only columns are computed but never enter the deployable feature set.
+    diag_present = [c for c in DIAGNOSTIC_FEATURES if c in df.columns]
+    if diag_present:
+        print(f"[panel] {len(diag_present)} PERFECT-FORESIGHT column(s) computed for the "
+              f"weather diagnostic and excluded from training: {diag_present}")
 
     n0 = len(df)
 

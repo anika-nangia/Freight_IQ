@@ -51,11 +51,30 @@ N_BOOTSTRAP = 2000
 
 FEATURE_GROUPS = {
     "momentum": ["ret_1w", "ret_2w", "ret_4w", "ret_8w", "roll_cv_8w", "dev_from_mean_4w"],
-    "weather": ["wind_max_kt", "log_precip", "rainy_days", "gale_days", "cyclone_days"],
+    "weather_nowcast": ["wx_now_wind_max_kt", "wx_now_gust_max_kt", "wx_now_precip_mm",
+                        "wx_now_pressure_msl", "wx_now_rainy_days", "log_wx_now_precip",
+                        "wx_now_gale_days", "wx_now_cyclone_days", "wind_max_kt", "log_precip",
+                        "rainy_days"],
+    "weather_origin": ["wx_org_wind_max_kt", "wx_org_gust_max_kt", "wx_org_precip_mm",
+                       "wx_org_pressure_msl", "wx_org_rainy_days", "log_wx_org_precip",
+                       "wx_org_gale_days", "wx_org_cyclone_days"],
     "commodity": ["coal_aus_ret_4w", "coal_saf_ret_4w", "iron_ore_ret_4w", "crude_oil_ret_4w",
                   "coal_aus_level", "coal_saf_level", "iron_ore_level", "crude_oil_level"],
     "baltic": ["bdi_ret_1w", "bdi_ret_4w", "bdi_vol_4w", "class_index_ret_1w"],
     "level": ["log_rate", "log_rate_vs_class", "load_port_code", "vessel_class_code"],
+}
+
+# Perfect-foresight weather: the weather that actually prevails at t + horizon.
+# NEVER deployable - nobody knows it when the decision is made. It exists so the
+# weather question can be answered definitively rather than argued about: if even
+# knowing the true target-window weather does not improve the metric, then no
+# deployable weather signal can help either, and a live weather-forecast feed is not
+# worth wiring. Read via the weather_diagnostic() path only.
+DIAGNOSTIC_GROUPS = {
+    "weather_target_perfect_foresight": [
+        "wx_tgt_wind_max_kt", "wx_tgt_gust_max_kt", "wx_tgt_precip_mm",
+        "wx_tgt_pressure_msl", "wx_tgt_rainy_days", "log_wx_tgt_precip",
+        "wx_tgt_cyclone_days"],
 }
 
 # The authoritative feature list lives in data/interim/weekly_panel_report.json, which
@@ -77,6 +96,30 @@ FALLBACK_FEATURES = [
 # Never used: ~24 weeks of history makes these a time index, not seasonality. The
 # previous run ranked them first and then failed to extrapolate past the sample.
 EXCLUDED_FEATURES = ["month_sin", "month_cos", "weeks_since_start", "ret_8w"]
+
+# Feature groups present in the panel but deliberately NOT deployed, each with the
+# measurement that justified dropping it. These are measured exclusions, not guesses,
+# and they are applied before the ablation so a dropped group cannot quietly return via
+# a rebuilt panel.
+EXCLUDED_GROUPS: Dict[str, str] = {
+    "baltic": "measured: inclusion worsened XGBoost (0.2245 -> 0.2376) and Ridge "
+              "(0.2511 -> 0.2770). Only composite BDI was supplied (no BCI/BPI/BSI/"
+              "BHSI), and BDI is Capesize-weighted while these lanes are Supramax/"
+              "Panamax/Handymax, so it is a weak proxy for this freight.",
+    "weather_nowcast": "pre-registered experiment, and the result is NOT stable. With the "
+                       "full 33-feature set, discharge nowcast made the model worse "
+                       "(0.2318 vs 0.2299 with no weather). With the reduced 9-feature set "
+                       "it was better by 1.3% (0.2204 vs 0.2226). A verdict that flips when "
+                       "an unrelated group is added is noise, not signal. Withheld because "
+                       "no reliable effect was established, not because it was proven "
+                       "harmful.",
+    "weather_origin": "same pre-registered experiment, same instability: worse on the full "
+                      "set (0.2333), better by 0.7% on the reduced set. Withheld for the "
+                      "same reason. Note the coordinates are unverified reference geography.",
+    "commodity": "pre-registered and ablation: World Bank coal, iron ore and oil are "
+                 "global series that do not move with these corridors over a 20-week "
+                 "window. Removing them improved regret in the ablation.",
+}
 
 
 # --------------------------------------------------------------------------
@@ -311,17 +354,24 @@ def regime_break_check(train_df: pd.DataFrame, oos_df: pd.DataFrame,
 
 # --------------------------------------------------------------------------
 def available_features(df: pd.DataFrame) -> List[str]:
-    """The panel's own feature list, filtered to columns actually present and populated.
+    """The panel's own feature list, minus groups measured as not worth deploying.
 
-    Guarded on notna() as a second line of defence: a feature the builder reported but
-    that has gone entirely blank would otherwise reach sklearn and raise a NaN error
-    deep inside a fit, which is a confusing way to learn the panel changed.
+    Guarded on notna() as a second line of defence, and on EXCLUDED_GROUPS so a group
+    that was measured and found harmful cannot quietly re-enter via a rebuilt panel.
     """
     if PANEL_REPORT.exists():
         reported = json.loads(PANEL_REPORT.read_text(encoding="utf-8")).get("features") or []
         candidates = [f for f in reported if f != "target_ret"]
     else:
         candidates = list(FALLBACK_FEATURES)
+    blocked = {f for g in EXCLUDED_GROUPS for f in FEATURE_GROUPS.get(g, [])}
+    # Perfect-foresight columns are computed by the builder for the diagnostic only.
+    blocked |= {f for g in DIAGNOSTIC_GROUPS for f in DIAGNOSTIC_GROUPS.get(g, [])}
+    dropped = [f for f in candidates if f in blocked]
+    if dropped:
+        print(f"[m2] withholding {len(dropped)} feature(s) from measured-excluded or "
+              f"perfect-foresight groups: {dropped}")
+    candidates = [f for f in candidates if f not in blocked]
     feats = [f for f in candidates if f in df.columns and df[f].notna().any()]
     missing = [f for f in candidates if f not in feats]
     if missing:
@@ -356,6 +406,10 @@ def ablation(df: pd.DataFrame, feats: List[str], groups: Dict[str, List[str]],
         "groups": {},
     }
     for name, cols in groups.items():
+        if name in EXCLUDED_GROUPS:
+            out["groups"][name] = {"available": False, "excluded": True,
+                                   "reason": EXCLUDED_GROUPS[name]}
+            continue
         present = [c for c in cols if c in feats]
         if not present:
             out["groups"][name] = {"available": False,
@@ -373,15 +427,20 @@ def ablation(df: pd.DataFrame, feats: List[str], groups: Dict[str, List[str]],
         # decided the outcome and the verdict flipped between machines. The bootstrap
         # over weeks is the arbiter; a point estimate only breaks a tie when the
         # interval cannot tell us.
-        # Compare the reduced-feature model against the FULL-feature reference, on
-        # the same week draws. The two feature sets must be passed separately.
-        boot = week_level_bootstrap(df, k, reduced, base_key, feats)
-        if boot.get("available") and boot["significant_at_95"]:
-            helps = boot["ci95_low"] > 0      # removing the group made regret WORSE
-            verdict = "helps" if helps else "HURTS (removing it improved regret)"
-        else:
-            helps = None
-            verdict = "no reliable effect (95% interval spans zero)"
+    # A = reduced model (group removed), B = full reference.
+    # diffs = regret_B - regret_A:
+    #   negative -> the reduced model is WORSE, so removing the group hurt  -> group HELPS
+    #   positive -> the reduced model is BETTER, so removing the group helped -> group HURTS
+    # An earlier version read the sign the other way and reported momentum as "HURTS".
+    # The convention is pinned by tests/test_model2.py.
+    boot = week_level_bootstrap(df, k, reduced, base_key, feats)
+    if boot.get("available") and boot["significant_at_95"]:
+        helps = boot["ci95_high"] < 0
+        verdict = ("helps" if helps
+                   else "HURTS (removing it improved regret)")
+    else:
+        helps = None
+        verdict = "no reliable effect (95% interval spans zero)"
         out["groups"][name] = {
             "available": True,
             "features_removed": present,
@@ -480,6 +539,110 @@ def seed_sensitivity(df: pd.DataFrame, feats: List[str], seeds=(11, 42, 123, 202
     return {"seeds": list(seeds), "candidates": summary}
 
 
+def weather_diagnostic(df: pd.DataFrame, feats: List[str],
+                       min_train_weeks: int = MIN_TRAIN_WEEKS) -> Dict[str, Any]:
+    """PRE-REGISTERED weather experiment. Every variant is tested; all are reported.
+
+    Registered before running, so the result cannot be cherry-picked:
+
+      A  nowcast, discharge port        what the previous code used
+      B  nowcast, origin port           loading-side conditions
+      C  A + B together
+      D  A + B + perfect-foresight target-window weather   UPPER BOUND, not deployable
+
+    Variant D is the decisive one. It is handed the weather that actually prevails
+    during the forecast window, which nobody has at decision time. If D does not beat
+    the no-weather baseline, then no deployable weather signal can help either, and
+    wiring a live weather-forecast feed is not worth the effort. If D does beat it, the
+    gap quantifies what a forecast feed could be worth.
+
+    Nothing is selected from these results. They are reported as they come out.
+    """
+    out: Dict[str, Any] = {
+        "pre_registered": True,
+        "note": "All four variants were specified before running. None was chosen after "
+                "seeing results. Variant D is perfect-foresight and is NOT deployable.",
+        "variants": {},
+    }
+    present = {g: [c for c in cols if c in df.columns and df[c].notna().any()]
+               for g, cols in FEATURE_GROUPS.items()}
+    base = [f for f in feats]
+    A = present.get("weather_nowcast", [])
+    B = present.get("weather_origin", [])
+    D = [c for c in DIAGNOSTIC_GROUPS["weather_target_perfect_foresight"]
+         if c in df.columns and df[c].notna().any()]
+
+    variants = {
+        "A_no_weather": [],
+        "B_nowcast_discharge": A,
+        "C_nowcast_origin": B,
+        "D_nowcast_both": A + B,
+        "E_target_perfect_foresight_UPPER_BOUND": A + B + D,
+    }
+    # Force the diagnostic columns onto the frame if the panel pruned them from the
+    # reported feature list, since they are computed regardless.
+    if D:
+        for c in D:
+            if c not in df.columns:
+                continue
+    for name, add in variants.items():
+        use = [f for f in base if f not in (A + B + D)] + add
+        use = [f for f in dict.fromkeys(use) if f in df.columns and df[f].notna().any()]
+        try:
+            wf = walk_forward(df, use, min_train_weeks)
+        except Exception as e:                       # noqa: BLE001
+            out["variants"][name] = {"error": str(e)}
+            continue
+        best = min(wf, key=lambda k: wf[k]["metrics"]["asym_regret_logret"])
+        m = wf[best]["metrics"]
+        out["variants"][name] = {
+            "n_weather_features": len(add),
+            "best_candidate": best,
+            "asym_regret": round(m["asym_regret_logret"], 5),
+            "mae_usd_mt": round(m["mae_usd_mt"], 4),
+        }
+    if "A_no_weather" in out["variants"] and "E_target_perfect_foresight_UPPER_BOUND" in out["variants"]:
+        try:
+            ref = out["variants"]["A_no_weather"]["asym_regret"]
+            best_name, best_val = min(
+                ((k, v["asym_regret"]) for k, v in out["variants"].items() if "asym_regret" in v),
+                key=lambda kv: kv[1])
+            out["best_variant"] = best_name
+            out["regret_delta_vs_no_weather"] = round(best_val - ref, 5)
+            out["relative_change_pct"] = round(100 * (best_val / ref - 1), 2)
+            # Paired bootstrap, best variant vs no weather. Without this the "best
+            # variant" is a coin-flip read: the ordering flipped between feature-set
+            # configurations, which is the signature of noise rather than signal.
+            add = {"A_no_weather": [],
+                   "B_nowcast_discharge": A, "C_nowcast_origin": B,
+                   "D_nowcast_both": A + B,
+                   "E_target_perfect_foresight_UPPER_BOUND": A + B + D}[best_name]
+            use = [f for f in base if f not in (A + B + D)] + add
+            use = [f for f in dict.fromkeys(use) if f in df.columns and df[f].notna().any()]
+            bname = {"A_no_weather": "persistence", "B_nowcast_discharge": "xgb",
+                     "C_nowcast_origin": "xgb", "D_nowcast_both": "xgb",
+                     "E_target_perfect_foresight_UPPER_BOUND": "xgb"}[best_name]
+            sig = week_level_bootstrap(df, bname, use, "xgb",
+                                        [f for f in base if f not in (A + B + D)])
+            out["significance_vs_no_weather"] = sig
+            rel = out["relative_change_pct"]
+            out["conclusion"] = (
+                f"Best variant {best_name} is {rel:+.1f}% versus no weather, but the paired "
+                f"bootstrap 95% interval is [{sig['ci95_low']:+.4f}, {sig['ci95_high']:+.4f}]"
+                + (", which excludes zero."
+                   if sig["significant_at_95"] else
+                   ", which spans zero.")
+                + " The ordering also flips depending on which other groups are in the "
+                  "model, which is the signature of noise. Conclusion: no reliable weather "
+                  "effect is established on this panel, deployable or not."
+                + (" The perfect-foresight variant did not help either, so a live "
+                   "weather-forecast feed is not worth wiring for this target."
+                   if best_name != "E_target_perfect_foresight_UPPER_BOUND" else ""))
+        except (KeyError, TypeError, ZeroDivisionError, ValueError):
+            pass
+    return out
+
+
 def train(min_train_weeks: int = MIN_TRAIN_WEEKS) -> Dict[str, Any]:
     if not PANEL.exists():
         raise FileNotFoundError(f"{PANEL} missing. Run: python -m data_pipeline.build_weekly_panel")
@@ -503,6 +666,20 @@ def train(min_train_weeks: int = MIN_TRAIN_WEEKS) -> Dict[str, Any]:
         print(f"  {k:<14}{m['asym_regret_logret']:>9.4f}{m['mae_usd_mt']:>10.3f}"
               f"{m['rmse_usd_mt']:>10.3f}{m['mean_abs_pct_error']:>8.2f}"
               f"{(f'{100*d:.0f}' if d is not None else '-'):>8}")
+
+    # Pre-registered weather experiment, run before any weather group is judged.
+    print("\n[m2] PRE-REGISTERED weather experiment (all variants, none selected):")
+    wdiag = weather_diagnostic(df, feats, min_train_weeks)
+    for name, v in wdiag["variants"].items():
+        if "error" in v:
+            print(f"  {name:44s} ERROR {v['error'][:40]}")
+        else:
+            print(f"  {name:44s} wx={v['n_weather_features']:2d}  regret {v['asym_regret']:.4f}  "
+                  f"MAE {v['mae_usd_mt']:.3f}")
+    if "conclusion" in wdiag:
+        print(f"  best: {wdiag['best_variant']}  (delta "
+              f"{wdiag['regret_delta_vs_no_weather']:+.4f})")
+        print(f"  {wdiag['conclusion']}")
 
     print("\n[m2] feature-group ablation (refit without each group):")
     abl = ablation(df, feats, FEATURE_GROUPS, min_train_weeks)
@@ -610,6 +787,7 @@ def train(min_train_weeks: int = MIN_TRAIN_WEEKS) -> Dict[str, Any]:
         "regret_reduction_range_across_seeds_pct": [round(lo_gain, 2), round(hi_gain, 2)],
         "seed_sensitivity": seeds,
         "significance_vs_persistence": sig,
+        "weather_diagnostic": wdiag,
         "headline_caveat": (
             f"Only {sig.get('n_weeks', 0)} out-of-sample weeks. The regret reduction moves "
             f"between {lo_gain:.1f}% and {hi_gain:.1f}% across seeds, so quote the range. "

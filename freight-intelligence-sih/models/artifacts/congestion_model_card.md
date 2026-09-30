@@ -1,6 +1,6 @@
 # Model 1 - Port Congestion: Model Card
 
-Trained 2026-09-30T13:47:51+00:00
+Trained 2026-09-30T19:19:16+00:00
 
 ## What the target is
 

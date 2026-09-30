@@ -1,0 +1,26 @@
+# Port coordinates for marine weather
+#
+# WHY THIS FILE EXISTS
+#   Weather is a feature in Model 2, and a weather feature is only meaningful if it
+#   describes the port whose conditions matter. data/port_constraints.csv already
+#   carries latitude/longitude for the 7 discharge ports. The 4 origin ports appearing
+#   in the rate history had no coordinates anywhere in the repo, so loading-side
+#   weather was impossible.
+#
+# PROVENANCE - READ BEFORE TRUSTING
+#   tier: unverified reference geography
+#   The discharge-port coordinates are project data (port_constraints.csv, which
+#   already carried them). The four ORIGIN coordinates below were added from general
+#   reference knowledge of port geography, NOT from a dataset in this repo, and they
+#   have NOT been verified against an authoritative gazetteer.
+#
+#   They are adequate for a regional marine forecast API, which is tolerant of a few
+#   kilometres, and inadequate for anything requiring berth-level precision. Verify
+#   them before relying on this file for anything other than weather.
+#
+#   To replace them with verified values, edit the table below. No code changes.
+origin,lat,lon,unverified_note
+Xingang,39.9250,119.6000,"Qinhuangdao, Hebei, China - approximate, unverified"
+Nikolaev,46.9750,31.9950,"Mykolaiv, Mykolaiv Oblast, Ukraine - approximate, unverified"
+Richards Bay,-28.8000,32.0800,"Richards Bay, KwaZulu-Natal, South Africa - approximate, unverified"
+Vanino,49.1000,140.3000,"Vanino, Khabarovsk Krai, Russia - approximate, unverified"

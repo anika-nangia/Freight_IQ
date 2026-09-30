@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-09-30T09:21:21+00:00",
+  "built_at": "2026-09-30T19:14:43+00:00",
   "target": "estimated_port_stay_days",
   "target_definition": "etc_or_etcd minus arrival_or_eta, read at the first snapshot where the vessel is recorded as Working and its arrival date has passed",
   "target_is_an_estimate": true,

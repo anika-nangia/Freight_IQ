@@ -172,11 +172,18 @@ def add_bdi_features(m: pd.DataFrame) -> Tuple[pd.DataFrame, bool]:
     out = pd.merge_asof(m.sort_values("month"), b.sort_values("month"),
                         on="month", direction="backward")
     # Per-vessel-class sub-index momentum, resolved at model time from vessel_class.
+    # The column is only created when at least one sub-index is present; the file
+    # supplied so far carries composite BDI only, so this block is a no-op rather
+    # than a KeyError on a column that was never built.
     for cls_col, cls in CLASS_OF_INDEX.items():
         src = f"{cls_col}_ret_1m"
         if src in out.columns:
             out["class_index_ret_1m"] = out[src].where(out["vessel_class"] == cls)
-    out["class_index_ret_1m"] = out.groupby("month")["class_index_ret_1m"].transform("mean")
+    if "class_index_ret_1m" in out.columns:
+        out["class_index_ret_1m"] = out.groupby("month")["class_index_ret_1m"].transform("mean")
+    else:
+        print(f"[corridor] no class sub-indices in {BDI.name}; "
+              f"per-class index momentum unavailable")
     return out, True
 
 

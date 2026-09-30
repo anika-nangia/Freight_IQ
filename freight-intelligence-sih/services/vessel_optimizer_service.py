@@ -184,8 +184,27 @@ class VesselOptimizerService:
 
     # ------------------------------------------------------------------ main
     def optimize(self, origin: str, destination: str, cargo_volume_mt: float,
-                 speed_knots: float = ASSUMED_SPEED_KNOTS) -> Dict[str, Any]:
-        """Rank vessel classes for a cargo, rejecting those the ports cannot accept."""
+                 speed_knots: float = ASSUMED_SPEED_KNOTS,
+                 forecast: Optional[Dict[str, Any]] = None,
+                 congestion: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Rank vessel classes by EXPECTED MARGIN, not cost alone.
+
+        With `forecast` supplied, each feasible class is scored as:
+
+            revenue = Model 2 predicted rate  x cargo tonnes
+            cost    = charter (day rate x voyage days)
+                    + port dues estimate
+                    + waiting cost (Model 1 port stay x day rate)
+            margin  = revenue - cost
+
+        Waiting cost is the part that matters operationally: a class that is cheap per
+        tonne but sits at anchor for a week burns day-rate the charter never recovers.
+        It is priced at the Model 1 80% upper band, not the point estimate, because
+        planning around the optimistic end of a turnaround is how berths get missed.
+
+        Without a forecast the service still runs, and says so: it reports cost per
+        tonne and marks the margin as unavailable rather than substituting a rate.
+        """
         specs = self.data["specs"]
         if specs is None:
             return {"available": False, "reason": f"{VESSEL_SPECS} missing"}
@@ -344,6 +363,13 @@ class VesselOptimizerService:
         rankable = [e for e in feasible if e["fits_cargo"] and e["cost_per_ton_usd"] is not None] or feasible
         recommended = min(rankable, key=lambda e: e["cost_per_ton_usd"]) if rankable else None
 
+        # ------------------------------------------------- margin, if we can
+        margin = self._margin(evaluations, rankable, cargo_volume_mt, forecast, congestion)
+        if margin.get("available"):
+            best = min(margin["per_class"], key=lambda r: r["rank_score"])
+            recommended = next((e for e in evaluations
+                                if e["vessel_class"] == best["vessel_class"]), recommended)
+
         # An origin with no limits on file cannot be feasibility-checked. Rather than
         # falling back to assumed limits and reporting a confident answer, the result
         # says the origin is unverified and marks the decision provisional.
@@ -355,6 +381,11 @@ class VesselOptimizerService:
 
         out: Dict[str, Any] = {
             "available": bool(recommended),
+            "ranking_basis": ("expected margin per voyage (Model 2 revenue vs charter + "
+                              "dues + Model 1 waiting cost)"
+                              if margin.get("available")
+                              else "cost per tonne only - no rate forecast available for "
+                                   "this corridor, so margin could not be computed"),
             "origin": origin_name,
             "origin_limits_verified": origin_verified,
             "origin_warning": (None if origin_verified else
@@ -367,6 +398,15 @@ class VesselOptimizerService:
             "effective_limits": effective,
             "recommended_vessel": recommended["vessel_class"] if recommended else None,
             "cost_per_ton_usd": recommended["cost_per_ton_usd"] if recommended else None,
+            "expected_margin_usd_per_voyage": (
+                next((r["margin_usd"] for r in margin.get("per_class", [])
+                      if r["vessel_class"] == recommended["vessel_class"]), None)
+                if margin.get("available") and recommended else None),
+            "expected_margin_usd_per_tonne": (
+                next((r["margin_usd_per_tonne"] for r in margin.get("per_class", [])
+                      if r["vessel_class"] == recommended["vessel_class"]), None)
+                if margin.get("available") and recommended else None),
+            "margin_detail": margin,
             "breakdown_usd_per_ton": None,
             "evaluations": evaluations,
             "admitted_despite_conflicting_limit": conflicting,
@@ -399,7 +439,95 @@ class VesselOptimizerService:
         return out
 
 
+    def _margin(self, evaluations: List[Dict[str, Any]], rankable: List[Dict[str, Any]],
+                cargo_volume_mt: float, forecast: Optional[Dict[str, Any]],
+                congestion: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Revenue from Model 2 against cost from the constraint tables and Model 1.
+
+        Returns available=False with a reason when the rate is unknown, rather than
+        borrowing a rate from anywhere. Cost-per-tonne alone does not tell a charterer
+        whether a voyage is worth doing, so the gap is stated instead of filled.
+        """
+        if not forecast or not forecast.get("available"):
+            return {"available": False,
+                    "reason": "no freight-rate forecast for this corridor, so revenue "
+                              "cannot be estimated. Ranking falls back to cost per tonne."}
+
+        rate = _num(forecast.get("forecast_rate_usd_mt"))
+        if rate is None:
+            return {"available": False, "reason": "forecast carried no usable rate"}
+
+        # Waiting days come from Model 1's 80% upper band, not the point estimate.
+        wait_days: Optional[float] = None
+        wait_source = "not available for this port"
+        if congestion and congestion.get("available"):
+            p80 = (congestion.get("turnaround_estimate") or {}).get("p80_range_days") or []
+            if len(p80) == 2 and p80[1] is not None:
+                wait_days = float(p80[1])
+                wait_source = ("Model 1 port stay, 80% upper band "
+                               f"({congestion.get('congestion_category')} congestion)")
+            else:
+                wait_source = "Model 1 has no turnaround range for this port"
+
+        rows: List[Dict[str, Any]] = []
+        for e in rankable:
+            day_rate = e.get("day_rate_usd")
+            voyage = e.get("total_voyage_days")
+            dues = e.get("port_dues_estimate_usd")
+            carried = min(cargo_volume_mt, e["dwt"]) if e.get("dwt") else cargo_volume_mt
+            if day_rate is None or voyage is None or dues is None or not carried:
+                continue
+            charter = day_rate * voyage
+            waiting = day_rate * wait_days if wait_days else 0.0
+            revenue = rate * cargo_volume_mt
+            cost = charter + dues + waiting
+            rows.append({
+                "vessel_class": e["vessel_class"],
+                "revenue_usd": round(revenue, 0),
+                "charter_cost_usd": round(charter, 0),
+                "port_dues_usd": round(dues, 0),
+                "waiting_cost_usd": round(waiting, 0),
+                "total_cost_usd": round(cost, 0),
+                "margin_usd": round(revenue - cost, 0),
+                "margin_usd_per_tonne": round((revenue - cost) / carried, 2),
+                "cost_per_ton_usd": e.get("cost_per_ton_usd"),
+                "voyage_days": voyage,
+                "tonnage_carried": carried,
+            })
+        if not rows:
+            return {"available": False, "reason": "no class had a complete cost breakdown"}
+
+        rows.sort(key=lambda r: -r["margin_usd"])
+        for i, r in enumerate(rows):
+            r["rank"] = i + 1
+            # Rank on margin, falling back to cost/tonne if margin ties at zero.
+            r["rank_score"] = -r["margin_usd"] if r["margin_usd"] else (r["cost_per_ton_usd"] or 0)
+
+        return {
+            "available": True,
+            "rate_used_usd_mt": rate,
+            "rate_as_of": forecast.get("current_observed_rate_as_of"),
+            "rate_horizon_days": forecast.get("horizon_days"),
+            "cargo_volume_mt": cargo_volume_mt,
+            "waiting_days_priced": wait_days,
+            "waiting_source": wait_source,
+            "per_class": rows,
+            "note": "Waiting is priced at the 80% upper band of Model 1's port stay, not "
+                    "the point estimate. Port dues remain a placeholder - no tariff data "
+                    "is held - so treat the margin as indicative to within that unknown.",
+        }
+
+
 _SERVICE: Optional[VesselOptimizerService] = None
+
+
+def _num(v: Any) -> Optional[float]:
+    if v is None:
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
 
 
 def get_service() -> VesselOptimizerService:

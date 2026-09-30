@@ -28,7 +28,14 @@ OUT = ROOT / "data" / "external" / "port_weather_daily.csv"
 ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
 FORECAST = "https://api.open-meteo.com/v1/forecast"
 
-DAILY = ["wind_speed_10m_max", "precipitation_sum", "wind_gusts_10m_max"]
+# Pressure, gusts and wave height are included because a forecast horizon is 2 weeks
+# and a single "wind speed" number at the origin is not going to carry a storm signal.
+# Mean sea-level pressure trend is what actually drives cyclone genesis, and gusts
+# separate a squall from a steady breeze in a way 10 m sustained wind does not.
+DAILY = [
+    "wind_speed_10m_max", "precipitation_sum", "wind_gusts_10m_max",
+    "pressure_msl_mean", "wave_height_max",
+]
 # Sahoo/FIMA cyclone proxy: sustained wind at 10m in km/h.
 # 62 km/h ~ 32 kt (cyclonic storm), 88 km/h ~ 47 kt (severe cyclonic storm) per IMD scale.
 CYCLONE_KMH = 62.0
@@ -36,6 +43,7 @@ GALE_KMH = 40.0
 
 TIMEOUT = 30
 UA = "FreightIQ/2.0 (student project; contact via repo)"
+ORIGIN_COORDS = ROOT / "data" / "raw" / "origin_port_coordinates.csv"
 
 
 def _get_json(url: str) -> Optional[dict]:
@@ -52,7 +60,38 @@ def _fmt(iso: str) -> str:
     return iso.replace("T00:00", "")
 
 
-def fetch_port(lat: float, lon: float, port: str,
+def _discharge_ports() -> Dict[str, Tuple[float, float]]:
+    import pandas as pd
+    p = pd.read_csv(ROOT / "data" / "port_constraints.csv")
+    out = {}
+    for _, r in p.iterrows():
+        if pd.notna(r.get("latitude")) and pd.notna(r.get("longitude")):
+            out[str(r["port_name"]).strip().title()] = (float(r["latitude"]), float(r["longitude"]))
+    return out
+
+
+def _origin_ports() -> Dict[str, Tuple[float, float]]:
+    """Origin-port coordinates, from data/raw/origin_port_coordinates.csv.
+
+    That file is explicitly marked unverified reference geography. The fetch is
+    skipped rather than guessed if the file is missing.
+    """
+    if not ORIGIN_COORDS.exists():
+        print(f"[weather] {ORIGIN_COORDS.name} absent -> loading-side weather skipped")
+        return {}
+    import pandas as pd
+    df = pd.read_csv(ORIGIN_COORDS, comment="#")
+    out = {}
+    for _, r in df.iterrows():
+        try:
+            out[str(r["origin"]).strip().title()] = (float(r["lat"]), float(r["lon"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+    print(f"[weather] origin ports from unverified reference file: {sorted(out)}")
+    return out
+
+
+def fetch_port(lat: float, lon: float, port: str, role: str = "discharge",
                start: str = "2025-09-01", end: Optional[str] = None) -> List[dict]:
     end = end or pd.Timestamp.now("UTC").strftime("%Y-%m-%d")
     q = (f"?latitude={lat}&longitude={lon}&start_date={start}&end_date={end}"
@@ -66,11 +105,14 @@ def fetch_port(lat: float, lon: float, port: str,
         ws = d.get(DAILY[0], [None] * len(d["time"]))[i]
         pr = d.get(DAILY[1], [None] * len(d["time"]))[i]
         gu = d.get(DAILY[2], [None] * len(d["time"]))[i]
+        pa = d.get(DAILY[3], [None] * len(d["time"]))[i]
+        wh = d.get(DAILY[4], [None] * len(d["time"]))[i]
         if ws is None:
             continue
         rows.append({
-            "port": port, "date": _fmt(day),
+            "port": port, "role": role, "date": _fmt(day),
             "wind_max_kmh": ws, "gust_max_kmh": gu, "precip_mm": pr,
+            "pressure_msl": pa, "wave_height_m": wh,
             "wind_max_kt": round(ws / 1.852, 2),
             "gale_flag": int(ws >= GALE_KMH),
             "cyclone_flag": int(ws >= CYCLONE_KMH),
@@ -102,31 +144,28 @@ def build(start: str = "2025-09-01", pause: float = 0.4) -> Optional[pd.DataFram
     if not PORTS_CSV.exists():
         print(f"[weather] {PORTS_CSV} missing; cannot resolve port coordinates")
         return None
-    ports = pd.read_csv(PORTS_CSV)
-    if not {"latitude", "longitude", "port_name"}.issubset(ports.columns):
-        print("[weather] port_constraints.csv lacks coordinates")
-        return None
-
     all_rows: List[dict] = []
-    for _, p in ports.iterrows():
-        lat, lon = p.get("latitude"), p.get("longitude")
-        if pd.isna(lat) or pd.isna(lon):
-            print(f"[weather] {p['port_name']}: no coordinates, skipped")
-            continue
-        r = fetch_port(float(lat), float(lon), str(p["port_name"]), start=start)
-        print(f"[weather] {p['port_name']:22s} {len(r):5d} days")
-        all_rows.extend(r)
-        time.sleep(pause)
+    groups = [("discharge", _discharge_ports()), ("origin", _origin_ports())]
+    for role, ports in groups:
+        for name, (lat, lon) in sorted(ports.items()):
+            r = fetch_port(lat, lon, name, role=role, start=start)
+            print(f"[weather] {role:9s} {name:22s} {len(r):5d} days")
+            all_rows.extend(r)
+            time.sleep(pause)
 
     if not all_rows:
         print("[weather] no rows retrieved (network?). Leaving cache untouched.")
         return None
 
     df = pd.DataFrame(all_rows).drop_duplicates(["port", "date"]).sort_values(["port", "date"])
+    if "role" not in df.columns:
+        df["role"] = "discharge"
     OUT.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUT, index=False)
     print(f"[weather] wrote {OUT} ({len(df)} rows, {df['port'].nunique()} ports, "
           f"{df['date'].min()} .. {df['date'].max()})")
+    print(f"[weather] discharge={df[df.role == 'discharge'].port.nunique()} "
+          f"origin={df[df.role == 'origin'].port.nunique()}")
     return df
 
 
