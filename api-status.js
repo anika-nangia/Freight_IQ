@@ -28,12 +28,14 @@
 (function () {
   "use strict";
 
-  // Browsers block fetch() from file:// for cross-origin reasons, and a hard-coded
-  // port would break the moment someone runs the API on another one. So: try the
-  // port the page was served from first, then the documented dev default.
+  // Try, in order: an explicit override, the origin the page was served from
+  // (http AND https - a public deploy is https and still has to reach its own
+  // API), then the local development ports.
   function candidateBases() {
     var list = [];
-    if (window.location && window.location.protocol === "http:") {
+    var configured = window.FREIGHTIQ_API_BASE;
+    if (configured) list.push(String(configured).replace(/\/+$/, ""));
+    if (window.location && String(window.location.protocol).indexOf("http") === 0) {
       list.push(window.location.origin);
     }
     list.push("http://127.0.0.1:8000");
