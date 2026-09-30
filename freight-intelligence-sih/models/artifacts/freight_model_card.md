@@ -1,6 +1,6 @@
 # Model 2 - Freight Rate Forecaster: Model Card
 
-Trained 2026-09-30T09:25:30+00:00 | target `log(rate[t+2w] / rate[t])` | loss asymmetric, alpha=2.5 under-forecast / beta=1.0 over-forecast
+Trained 2026-09-30T10:19:48+00:00 | target `log(rate[t+2w] / rate[t])` | loss asymmetric, alpha=2.5 under-forecast / beta=1.0 over-forecast
 
 ## Validation
 walk-forward refit every week, min 12 training weeks, scored on the unseen week only.

@@ -30,6 +30,8 @@ OBSERVED = "observed"        # published/observed market data
 DERIVED = "derived"          # computed by our code from observed data
 ESTIMATED = "estimated"      # modelled from proxy inputs because no observation exists
 UNAVAILABLE = "unavailable"  # no source; the API must say so instead of guessing
+UNVERIFIED = "unverified"    # source unconfirmed AND statistical structure is
+                             # inconsistent with independently observed data
 
 
 @dataclass
@@ -70,17 +72,32 @@ def _reg(spec: DatasetSpec) -> DatasetSpec:
 _reg(DatasetSpec(
     key="route_rates_weekly",
     path="data/training_matrix.csv",
-    tier=OBSERVED,
-    source="Project dataset (origin/vessel-level weekly USD/MT assessments). "
-           "Compiled by the team; the originating report has not been confirmed.",
+    tier=UNVERIFIED,
+    source="UNKNOWN. No publication identified. The upstream report has never been named.",
     source_url="",
     description="Weekly freight rate observations per (load_port, unload_port, vessel_type).",
     period="2025-10-03 .. 2026-03-27",
     entities="11 lanes x 4 vessel classes, East Coast India discharge",
-    license="internal",
-    notes="PROVENANCE GAP: no upstream publication confirmed. Treat as project data of "
-          "unknown origin until the team supplies the source. Every model metric that "
-          "depends on it inherits this caveat.",
+    license="unknown",
+    notes=(
+        "DO NOT RELY ON THESE AS OBSERVED MARKET DATA. Four structural properties are "
+        "inconsistent with independently assessed freight rates:\n"
+        "  1. Nikolaev->Paradip|Panamax and Nikolaev->Paradip/Haldia|Panamax hold a "
+        "constant ratio of 1.0492 (coefficient of variation 0.11%) across all 26 weeks. "
+        "Two separately assessed lanes do not track a fixed multiple to four decimal "
+        "places for six months.\n"
+        "  2. Pairwise correlation of the 2-week log return - the actual modelling target - "
+        "has a mean of 0.90 and a minimum of 0.52 across all lane pairs, including "
+        "Nikolaev (Black Sea coal) against Xingang (Chinese coal). Those are different "
+        "supply basins with different market drivers.\n"
+        "  3. One-week log returns have autocorrelation 0.49-0.58 in 10 of 11 lanes. "
+        "Assessed dry bulk rates are close to a random walk.\n"
+        "  4. Every lane carries exactly one cargo size across all 26 weeks.\n"
+        "This is the signature of a generated series: one curve per origin, rescaled per "
+        "vessel class, with small added jitter. It cannot be proved fabricated from the "
+        "file alone, but it must not be presented as observed. Every Model 2 metric "
+        "inherits this caveat, and a 0.90 mean cross-lane correlation means the pooled "
+        "model may be predicting a single synthetic curve rather than eleven markets."),
 ))
 
 _reg(DatasetSpec(
@@ -220,10 +237,19 @@ def coverage_report() -> List[Dict[str, Any]]:
 
 
 def coverage_by_tier() -> Dict[str, int]:
+    """Count datasets by effective status.
+
+    'loaded' alone is misleading: a file can be present and still be unverified, and a
+    coverage panel that only distinguishes present/absent would have kept reporting the
+    rate data as sound. The tier is folded in so `unverified_present` is its own bucket.
+    """
     rep = coverage_report()
     counts: Dict[str, int] = {}
     for r in rep:
-        counts[r["status"]] = counts.get(r["status"], 0) + 1
+        key = ("unverified_present" if r["tier"] == UNVERIFIED and r["present"]
+               else "unverified_absent" if r["tier"] == UNVERIFIED
+               else r["status"])
+        counts[key] = counts.get(key, 0) + 1
     return counts
 
 
