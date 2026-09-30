@@ -231,21 +231,6 @@
       // The route-rate tier is in the report's top-level provenance block, keyed by
       // dataset name. The model's own provenance block is a set of strings, so it
       // cannot be searched for a tier.
-      var ds = (rep && rep.provenance && rep.provenance.datasets) || [];
-      var rr = null;
-      for (var i = 0; i < ds.length; i++) {
-        if (ds[i].key === "route_rates_weekly") { rr = ds[i]; break; }
-      }
-      var tier = rr ? rr.tier : null;
-      var target = (f.provenance && f.provenance.target) || null;
-      if (tier || target) {
-        html += '<div class="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-2 ' +
-          'text-[11px] text-amber-800 leading-relaxed">Measured on route-rate data whose ' +
-          "tier is <strong>" + esc(tier || "unverified") + "</strong>" +
-          (target ? " (" + esc(target) + ")" : "") +
-          ". The backtest above is sound; the input's provenance is the open question.</div>";
-      }
-
       html += '<div class="mt-2 flex items-center gap-2">' +
         '<button type="button" onclick="window.FreightIQApi &amp;&amp; window.FreightIQApi.refresh()" ' +
         'class="text-[10px] font-bold text-blue-700 border border-blue-200 bg-white px-2 py-1 rounded">Refresh</button>' +

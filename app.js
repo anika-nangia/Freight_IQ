@@ -1318,16 +1318,6 @@ function renderDualForecastView() {
               <div class="text-slate-400 py-2">Contacting the model API&hellip;</div>
             </div>
           </div>
-
-          <div class="mt-6 pt-3 border-t border-slate-100 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-            <div class="text-[11px] font-bold text-slate-700 mb-1">What this chart does not show</div>
-            <div class="text-[11px] text-slate-600 leading-relaxed">
-              No congestion trend is drawn. Model 1 reads a single line-up snapshot per
-              port and the dataset holds no congestion history, so any congestion curve
-              here would be invented. The current snapshot is reported in the card
-              above instead.
-            </div>
-          </div>
         </div>
       </div>
     </div>
