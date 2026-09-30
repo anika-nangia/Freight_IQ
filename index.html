@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FreightIQ — Bulk Vessel Freight Forecasting & Decision Support</title>
+  <title>FreightIQ &mdash; Bulk Vessel Freight Forecasting & Decision Support</title>
   
   <!-- Google Fonts: Outfit (Brand & Headings) + Inter (UI & Numbers) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -79,7 +79,6 @@
       <!-- Right: Navigation Links & Login / User Section -->
       <div class="flex items-center gap-6">
         <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-          <a href="#modelStatus" class="hover:text-blue-600 transition-colors">Model Status</a>
           <a href="#about" class="hover:text-blue-600 transition-colors">About</a>
           <a href="#contact" class="hover:text-blue-600 transition-colors">Contact Us</a>
           <a href="#faq" class="hover:text-blue-600 transition-colors">FAQ</a>
@@ -104,7 +103,7 @@
         <img src="assets/logo.png" alt="FreightIQ" class="w-8 h-8 rounded-full border border-blue-200">
         <div>
           <div class="text-base font-bold text-slate-900 font-outfit leading-tight">FreightIQ Navigation</div>
-          <div class="text-[11px] text-slate-500">Ministry of Steel · Decision Support</div>
+          <div class="text-[11px] text-slate-500">Ministry of Steel &middot; Decision Support</div>
         </div>
       </div>
       <button id="closeSidebarBtn" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100">
@@ -154,7 +153,7 @@
         </div>
         <div>
           <div class="font-semibold text-slate-900">Recommendation System</div>
-          <div class="text-[10px] text-slate-400">Market Timing · Vessel Optimizer · Risk Monitor</div>
+          <div class="text-[10px] text-slate-400">Market Timing &middot; Vessel Optimizer &middot; Risk Monitor</div>
         </div>
       </button>
 
@@ -165,7 +164,7 @@
         </div>
         <div>
           <div class="font-semibold text-slate-900">Idle Scenario Analysis</div>
-          <div class="text-[10px] text-slate-400">Indian East Coast Ports · Congestion-based Allotment</div>
+          <div class="text-[10px] text-slate-400">Indian East Coast Ports &middot; Congestion-based Allotment</div>
         </div>
       </button>
 
@@ -218,7 +217,7 @@
           <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/85 border border-cyan-400/40 text-cyan-300 text-xs font-bold tracking-wide backdrop-blur-md shadow-sm">
               <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-              <span>FreightIQ · Maritime Intelligence Platform</span>
+              <span>FreightIQ &middot; Maritime Intelligence Platform</span>
             </div>
 
             <!-- Live Floating Telemetry Chips -->
@@ -228,7 +227,7 @@
                 <span class="font-semibold text-white">BDI:</span> 1,842 (+2.4%)
               </div>
               <div class="bg-slate-900/85 backdrop-blur-md border border-slate-700/80 text-xs px-3 py-1.5 rounded-full shadow-xs flex items-center gap-1.5 text-slate-200">
-                <span class="font-semibold text-white">USD/INR:</span> ₹83.42
+                <span class="font-semibold text-white">USD/INR:</span> &#8377;83.42
               </div>
             </div>
           </div>
@@ -249,8 +248,8 @@
 
           <!-- Button to lead to Congestion-Based & Historical Freight Forecaster -->
           <div class="my-4">
-            <button id="viewForecastBtn" onclick="state.activeTab='dual-forecast'; renderApp(); window.scrollTo({ top: 0, behavior: 'smooth' });" type="button" class="inline-flex items-center gap-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 active:from-indigo-800 text-white font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 font-outfit cursor-pointer border border-blue-400/30">
-              <svg class="w-4 h-4 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
+            <button id="viewForecastBtn" onclick="state.activeTab='dual-forecast'; renderApp(); window.scrollTo({ top: 0, behavior: 'smooth' });" type="button" class="inline-flex items-center gap-2.5 bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 active:from-blue-900 text-white font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 font-outfit cursor-pointer">
+              <svg class="w-4 h-4 text-cyan-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
               <span>View Freight Forecast for the Indian East Coast</span>
             </button>
           </div>
@@ -287,27 +286,27 @@
                   <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">To</label>
                   <select id="destSelect" class="auth-guarded-input bg-transparent text-sm font-bold text-slate-800 w-full focus:outline-none cursor-pointer">
                     <optgroup label="Australia">
-                      <option value="Australia — Newcastle - Kooragang" selected>Australia — Newcastle - Kooragang</option>
-                      <option value="Australia — Newcastle - Carrington">Australia — Newcastle - Carrington</option>
-                      <option value="Australia — Newcastle - NCIG">Australia — Newcastle - NCIG</option>
-                      <option value="Australia — Hay Point Coal Terminal">Australia — Hay Point Coal Terminal</option>
-                      <option value="Australia — Dalrymple Bay Coal Terminal">Australia — Dalrymple Bay Coal Terminal</option>
-                      <option value="Australia — Abbot Point Coal Terminal">Australia — Abbot Point Coal Terminal</option>
+                      <option value="Australia &mdash; Newcastle - Kooragang" selected>Australia &mdash; Newcastle - Kooragang</option>
+                      <option value="Australia &mdash; Newcastle - Carrington">Australia &mdash; Newcastle - Carrington</option>
+                      <option value="Australia &mdash; Newcastle - NCIG">Australia &mdash; Newcastle - NCIG</option>
+                      <option value="Australia &mdash; Hay Point Coal Terminal">Australia &mdash; Hay Point Coal Terminal</option>
+                      <option value="Australia &mdash; Dalrymple Bay Coal Terminal">Australia &mdash; Dalrymple Bay Coal Terminal</option>
+                      <option value="Australia &mdash; Abbot Point Coal Terminal">Australia &mdash; Abbot Point Coal Terminal</option>
                     </optgroup>
                     <optgroup label="Indonesia">
-                      <option value="Indonesia — Taboneo (Banjarmasin anchorage)">Indonesia — Taboneo (Banjarmasin anchorage)</option>
+                      <option value="Indonesia &mdash; Taboneo (Banjarmasin anchorage)">Indonesia &mdash; Taboneo (Banjarmasin anchorage)</option>
                     </optgroup>
                     <optgroup label="Mozambique">
-                      <option value="Mozambique — Beira">Mozambique — Beira</option>
+                      <option value="Mozambique &mdash; Beira">Mozambique &mdash; Beira</option>
                     </optgroup>
                     <optgroup label="Russia">
-                      <option value="Russia — Nakhodka">Russia — Nakhodka (Commercial Sea Port)</option>
-                      <option value="Russia — Vostochny">Russia — Vostochny (VPK Port)</option>
+                      <option value="Russia &mdash; Nakhodka">Russia &mdash; Nakhodka (Commercial Sea Port)</option>
+                      <option value="Russia &mdash; Vostochny">Russia &mdash; Vostochny (VPK Port)</option>
                     </optgroup>
                     <optgroup label="United States">
-                      <option value="United States — Norfolk - Lamberts Point Pier 6">United States — Norfolk - Lamberts Point Pier 6</option>
-                      <option value="United States — Newport News - Kinder Morgan Pier IX">United States — Newport News - Kinder Morgan Pier IX</option>
-                      <option value="United States — Baltimore - CNX Marine Terminal (Curtis Bay)">United States — Baltimore - CNX Marine Terminal (Curtis Bay)</option>
+                      <option value="United States &mdash; Norfolk - Lamberts Point Pier 6">United States &mdash; Norfolk - Lamberts Point Pier 6</option>
+                      <option value="United States &mdash; Newport News - Kinder Morgan Pier IX">United States &mdash; Newport News - Kinder Morgan Pier IX</option>
+                      <option value="United States &mdash; Baltimore - CNX Marine Terminal (Curtis Bay)">United States &mdash; Baltimore - CNX Marine Terminal (Curtis Bay)</option>
                     </optgroup>
                   </select>
                 </div>
@@ -376,7 +375,7 @@
               <div>
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-semibold text-slate-500">Expected Rate</span>
-                  <span class="cursor-pointer text-slate-400 hover:text-slate-600 text-xs" title="Forecasted spot rate calculated by XGBoost Asymmetric Regret Model">ⓘ</span>
+                  <span class="cursor-pointer text-slate-400 hover:text-slate-600 text-xs" title="Forecasted spot rate calculated by XGBoost Asymmetric Regret Model">&#9416;</span>
                   <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
                     High Confidence
                   </span>
@@ -386,7 +385,7 @@
                   <span id="cardPriceUnit" class="text-sm font-semibold text-slate-500">per ton</span>
                 </div>
                 <div id="cardTypicalRange" class="text-xs text-slate-400 mt-1">
-                  Typical range: $16.80 – $21.20 per ton
+                  Typical range: $16.80 &ndash; $21.20 per ton
                 </div>
                 <div id="cardVoyageTotal" class="text-xs text-blue-700 font-semibold mt-1">
                   Estimated voyage fixture: ~$1,012,000 per vessel (55,000 MT Supramax)
@@ -396,15 +395,15 @@
               <!-- Right: Recent Trends -->
               <div class="sm:text-right bg-slate-50 p-3 rounded-xl border border-slate-100">
                 <div class="text-xs font-semibold text-slate-500 mb-1 flex sm:justify-end items-center gap-1">
-                  Recent Trends <span class="cursor-pointer text-slate-400">ⓘ</span>
+                  Recent Trends <span class="cursor-pointer text-slate-400">&#9416;</span>
                 </div>
                 <div class="text-xs text-slate-600 flex sm:justify-end items-center gap-2">
                   <span>Compared to last week:</span>
-                  <span id="trendWeekDiff" class="text-red-500 font-bold">↑ $0.50</span>
+                  <span id="trendWeekDiff" class="text-red-500 font-bold">&uarr; $0.50</span>
                 </div>
                 <div class="text-xs text-slate-600 flex sm:justify-end items-center gap-2 mt-0.5">
                   <span>Compared to last month:</span>
-                  <span id="trendMonthDiff" class="text-emerald-600 font-bold">↓ $1.20</span>
+                  <span id="trendMonthDiff" class="text-emerald-600 font-bold">&darr; $1.20</span>
                 </div>
               </div>
             </div>
@@ -421,7 +420,7 @@
                       <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
                       Bunker Fuel Prices (VLSFO Benchmark)
                     </span>
-                    <span class="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+                    <span class="text-slate-400 group-open:rotate-180 transition-transform">&blacktriangledown;</span>
                   </summary>
                   <div class="mt-2.5 pt-2.5 border-t border-slate-200 text-xs text-slate-600 space-y-1">
                     <div class="flex justify-between"><span>Singapore / Fujairah VLSFO:</span><span class="font-semibold text-slate-800">$620 / MT</span></div>
@@ -437,7 +436,7 @@
                       <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                       Port Dues, Pilotage & Berth Hire
                     </span>
-                    <span class="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+                    <span class="text-slate-400 group-open:rotate-180 transition-transform">&blacktriangledown;</span>
                   </summary>
                   <div class="mt-2.5 pt-2.5 border-t border-slate-200 text-xs text-slate-600 space-y-1">
                     <div class="flex justify-between"><span>Pilotage & Towage:</span><span class="font-semibold text-slate-800">$0.42 / GRT</span></div>
@@ -482,7 +481,7 @@
             <!-- Action Card 1: Timing Recommendation -->
             <div class="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-start gap-3">
               <div class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 text-xs">
-                🟢
+                &#128994;
               </div>
               <div>
                 <div class="text-[11px] font-bold uppercase text-emerald-800">Timing Recommendation</div>
@@ -495,7 +494,7 @@
             <!-- Action Card 2: Vessel Recommendation -->
             <div class="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl flex items-start gap-3">
               <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 text-xs">
-                🚢
+                &#128674;
               </div>
               <div>
                 <div class="text-[11px] font-bold uppercase text-blue-800">Vessel Recommendation</div>
@@ -508,7 +507,7 @@
             <!-- Action Card 3: Repositioning Alert -->
             <div class="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-start gap-3">
               <div class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 text-xs">
-                🔄
+                &#128260;
               </div>
               <div>
                 <div class="text-[11px] font-bold uppercase text-indigo-800">Repositioning Alert (Anti-Deadhead)</div>
@@ -521,7 +520,7 @@
             <!-- Action Card 4: Risk Warning -->
             <div class="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl flex items-start gap-3">
               <div class="w-7 h-7 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 text-xs">
-                ⚠️
+                &warning;&#xfe0f;
               </div>
               <div>
                 <div class="text-[11px] font-bold uppercase text-amber-800">Risk Warning</div>
@@ -596,7 +595,7 @@
       <!-- Quick 1-Click Demo Login Button -->
       <div class="mb-5">
         <button id="demoLoginBtn" type="button" class="w-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-semibold text-xs py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-xs">
-          <span>🚀 Instant Demo Login (SAIL Logistics Officer)</span>
+          <span>&#128640; Instant Demo Login (SAIL Logistics Officer)</span>
         </button>
       </div>
 
@@ -609,10 +608,10 @@
       <!-- Dual Tabs: Email vs Phone -->
       <div class="flex border-b border-slate-200 mb-5 text-xs font-semibold">
         <button id="tabLoginEmail" class="flex-1 py-2.5 text-center border-b-2 border-blue-600 text-blue-600 transition-colors">
-          ✉️ Email Address
+          &#9993;&#xfe0f; Email Address
         </button>
         <button id="tabLoginPhone" class="flex-1 py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors">
-          📱 Phone Number
+          &#128241; Phone Number
         </button>
       </div>
 
@@ -643,7 +642,7 @@
           <label class="block text-xs font-semibold text-slate-700 mb-1">Mobile Number</label>
           <div class="flex">
             <span class="inline-flex items-center px-3 text-xs text-slate-500 bg-slate-100 border border-r-0 border-slate-200 rounded-l-xl font-semibold">
-              🇮🇳 +91
+              &#127470;&#127475; +91
             </span>
             <input id="loginPhoneInput" type="tel" value="" placeholder="98401 23456" class="w-full text-xs px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-r-xl focus:outline-none focus:border-blue-500 focus:bg-white transition-colors" required autocomplete="off">
           </div>
@@ -687,141 +686,21 @@
   <!-- ======================================================== -->
   <!-- FOOTER -->
   <!-- ======================================================== -->
-  <section id="modelStatus" class="scroll-mt-20 bg-slate-50 border-t border-slate-200 py-14">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <h2 class="text-2xl font-black text-slate-900 font-outfit">Live Model Status</h2>
-        <button type="button" onclick="window.FreightIQApi &amp;&amp; window.FreightIQApi.refresh()"
-          class="text-xs font-bold text-blue-700 hover:text-blue-900 border border-blue-200 bg-white px-3 py-1.5 rounded-lg">
-          Refresh
-        </button>
-      </div>
-      <p class="text-sm text-slate-600 mb-5 max-w-3xl leading-relaxed">
-        Served live from the trained models. This panel reports what the models actually
-        measured, including results that did not beat a simple baseline. If the backend
-        is not running, the rest of the page continues to work on its built-in data.
-      </p>
-      <div id="apiStatusBody">
-        <div class="p-4 text-sm text-slate-500">Loading…</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================================================================== -->
-  <!-- STATIC INFO SECTIONS                                                 -->
-  <!-- Placed outside #mainViewContainer so renderApp() cannot replace them. -->
-  <!-- These give the header nav links (#about, #contact, #faq) real targets. -->
-  <!-- ================================================================== -->
-
-  <section id="about" class="scroll-mt-20 bg-white border-t border-slate-200 py-14">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <h2 class="text-2xl font-black text-slate-900 font-outfit mb-3">About FreightIQ</h2>
-      <p class="text-slate-600 leading-relaxed mb-3">
-        FreightIQ is a dry bulk chartering decision-support system. It forecasts freight
-        rates, estimates port congestion, and turns both into four operational
-        recommendations: market entry timing, vessel selection, idle and deadheading
-        exposure, and risk warnings.
-      </p>
-      <p class="text-slate-600 leading-relaxed">
-        The system is built around a data-provenance contract: every number it returns
-        carries its source, the date it was observed, and a confidence flag. Where a
-        dataset is missing or unverified, the API returns that fact instead of an
-        estimate. <span class="font-semibold text-slate-800">Not every model result is
-        positive</span> &mdash; where a model fails to beat a simple baseline, that is
-        reported rather than hidden.
-      </p>
-    </div>
-  </section>
-
-  <section id="contact" class="scroll-mt-20 bg-slate-50 border-t border-slate-200 py-14">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <h2 class="text-2xl font-black text-slate-900 font-outfit mb-3">Contact Us</h2>
-      <p class="text-slate-600 leading-relaxed mb-4">
-        For chartering enquiries, data corrections, or to supply additional freight
-        rate history, contact the project team through your institute.
-      </p>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-        <div class="bg-white border border-slate-200 rounded-xl p-4">
-          <div class="font-bold text-slate-800 mb-1">Data contributions</div>
-          <p class="text-slate-600">
-            Route rate histories, port line-up reports, and port tariff data are the
-            highest-value contributions. See the repository README for exactly what is
-            missing.
-          </p>
-        </div>
-        <div class="bg-white border border-slate-200 rounded-xl p-4">
-          <div class="font-bold text-slate-800 mb-1">Methodology questions</div>
-          <p class="text-slate-600">
-            Validation results, known limits and the full model cards are in
-            <code class="text-xs bg-slate-100 px-1 py-0.5 rounded">METHODS.md</code>
-            and at <code class="text-xs bg-slate-100 px-1 py-0.5 rounded">GET /api/model-report</code>.
-          </p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section id="faq" class="scroll-mt-20 bg-white border-t border-slate-200 py-14">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <h2 class="text-2xl font-black text-slate-900 font-outfit mb-5">Frequently Asked Questions</h2>
-
-      <div class="space-y-4">
-        <details class="bg-slate-50 border border-slate-200 rounded-xl p-4">
-          <summary class="font-bold text-slate-800 cursor-pointer">Where does the freight rate data come from?</summary>
-          <p class="text-slate-600 mt-2 text-sm leading-relaxed">
-            It is the project's own dataset and its upstream publication has not been
-            confirmed, so it is labelled <code class="text-xs">unverified</code>. Its
-            statistical structure is also inconsistent with independently assessed rates
-            (lanes hold near-constant ratios to one another). Every forecast inherits
-            that caveat, and <code class="text-xs">GET /api/data-coverage</code> reports it.
-          </p>
-        </details>
-
-        <details class="bg-slate-50 border border-slate-200 rounded-xl p-4">
-          <summary class="font-bold text-slate-800 cursor-pointer">Why does the app return "no rate history" for some routes?</summary>
-          <p class="text-slate-600 mt-2 text-sm leading-relaxed">
-            The system will not quote a rate for a corridor it has never observed. There
-            is currently no history for US, Australia, Indonesia, Mozambique or
-            Handysize lanes. <code class="text-xs">GET /api/corridors</code> lists what
-            is available.
-          </p>
-        </details>
-
-        <details class="bg-slate-50 border border-slate-200 rounded-xl p-4">
-          <summary class="font-bold text-slate-800 cursor-pointer">Does the congestion model predict real turnaround times?</summary>
-          <p class="text-slate-600 mt-2 text-sm leading-relaxed">
-            No. The port line-up data has no actual completion or departure field, so
-            realised turnaround cannot be measured from it. The model estimates the
-            port's own published schedule, and a per-port median currently matches or
-            beats every fitted candidate on held-out data.
-          </p>
-        </details>
-
-        <details class="bg-slate-50 border border-slate-200 rounded-xl p-4">
-          <summary class="font-bold text-slate-800 cursor-pointer">Does this site need the backend running?</summary>
-          <p class="text-slate-600 mt-2 text-sm leading-relaxed">
-            No. The app ships with its own built-in data and degrades to it when the API
-            is unreachable. To show live model output, start the backend and serve this
-            page over HTTP rather than opening the file directly.
-          </p>
-        </details>
-      </div>
-    </div>
-  </section>
 
   <footer class="bg-white border-t border-slate-200 mt-12 py-8 text-xs text-slate-500">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
       <div class="flex items-center gap-2">
         <img src="assets/logo.png" alt="FreightIQ" class="w-6 h-6 rounded-full border border-blue-200">
-        <span class="font-bold text-slate-800">FreightIQ</span> — Decision Support System for Steel & Bulk Shipping
+        <span class="font-bold text-slate-800">FreightIQ</span> &mdash; Decision Support System for Steel & Bulk Shipping
       </div>
     </div>
   </footer>
 
   <!-- Master JavaScript Application -->
   <script src="app.js"></script>
-  <!-- Live model status panel. Fails silently to an offline notice, so the page
-       keeps working when the FastAPI backend is not running. -->
+  <!-- Live model read-out: fills the "Model Evaluation" panel and the recommendation
+       engine page. Fails silently to an offline notice, so the page keeps working
+       when the FastAPI backend is not running. -->
   <script src="api-status.js"></script>
 </body>
 </html>

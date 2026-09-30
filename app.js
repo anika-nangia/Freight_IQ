@@ -15,7 +15,7 @@ const state = {
   query: {
     origin: "Indian East Coast Ports, India",
     originCountry: "India",
-    destination: "Australia — Newcastle - Kooragang",
+    destination: "Australia \u2014 Newcastle - Kooragang",
     destinationState: "New South Wales",
     vesselType: "Supramax",
     unit: "$/Ton"
@@ -718,7 +718,7 @@ function initEventListeners() {
     recordModelHistoryEntry({
       action: "Infrastructure Constraints Analysis",
       category: "infrastructure",
-      notes: `Compared LOA & Draft constraints for corridor: ${state.query.origin} → ${state.query.destination}.`
+      notes: `Compared LOA & Draft constraints for corridor: ${state.query.origin} \u2192 ${state.query.destination}.`
     });
     showToast("Navigating to Infrastructure Constraints & Port Capabilities Analysis.");
   });
@@ -736,7 +736,7 @@ function initEventListeners() {
 let formChangeTimeout = null;
 function handleFormChange() {
   const originVal = document.getElementById("originSelect")?.value || "Indian East Coast Ports, India";
-  const destVal = document.getElementById("destSelect")?.value || "Australia — Newcastle - Kooragang";
+  const destVal = document.getElementById("destSelect")?.value || "Australia \u2014 Newcastle - Kooragang";
   const vesselVal = document.getElementById("vesselTypeSelect")?.value || state.query.vesselType || "Supramax";
 
   state.query.origin = originVal;
@@ -756,7 +756,7 @@ function handleFormChange() {
       recordModelHistoryEntry({
         action: "Route Query Update",
         category: "valuation",
-        notes: `Updated corridor query: ${originVal} → ${destVal} (${vesselVal}).`
+        notes: `Updated corridor query: ${originVal} \u2192 ${destVal} (${vesselVal}).`
       });
     }, 600);
   }
@@ -888,7 +888,7 @@ function getCalculatedMetrics() {
   }
 
   const expectedPriceStr = `$${baseRate.toFixed(2)}`;
-  const typicalRangeStr = `$${typicalMin.toFixed(2)} – $${typicalMax.toFixed(2)} per ton`;
+  const typicalRangeStr = `$${typicalMin.toFixed(2)} \u2013 $${typicalMax.toFixed(2)} per ton`;
   const totalVoyageCost = Math.round(baseRate * cargoDwt);
   const totalVoyageCostStr = `Estimated Voyage Fixture: ~$${totalVoyageCost.toLocaleString()} per vessel (${cargoDwt.toLocaleString()} MT ${vessel})`;
 
@@ -916,7 +916,7 @@ function renderResultsSection() {
   if (summaryLane) {
     summaryLane.innerHTML = `
       <span class="font-bold text-slate-900">${state.query.origin}</span>
-      <span class="text-slate-400 mx-2">→</span>
+      <span class="text-slate-400 mx-2">\u2192</span>
       <span class="font-bold text-slate-900">${state.query.destination}</span>
       <span class="text-slate-300 mx-2.5">|</span>
       <span class="text-blue-700 font-semibold">${state.query.vesselType} Bulk Carrier</span>
@@ -937,8 +937,8 @@ function renderResultsSection() {
   if (unitVal) unitVal.textContent = m.unit;
   if (rangeVal) rangeVal.textContent = `Typical range: ${m.typicalRangeStr}`;
   if (voyageVal) voyageVal.textContent = m.totalVoyageCostStr;
-  if (weekDiff) weekDiff.innerHTML = `<span class="text-red-500 font-semibold">↑ ${m.lastWeekDiff}</span>`;
-  if (monthDiff) monthDiff.innerHTML = `<span class="text-emerald-600 font-semibold">↓ ${m.lastMonthDiff}</span>`;
+  if (weekDiff) weekDiff.innerHTML = `<span class="text-red-500 font-semibold">\u2191 ${m.lastWeekDiff}</span>`;
+  if (monthDiff) monthDiff.innerHTML = `<span class="text-emerald-600 font-semibold">\u2193 ${m.lastMonthDiff}</span>`;
 
   drawMarketTrendsChart();
 }
@@ -1123,7 +1123,7 @@ function drawMarketTrendsChart() {
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 9px Inter, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("● TODAY", todayX, padding.top - 6);
+  ctx.fillText("\u25cf TODAY", todayX, padding.top - 6);
 
   // Callout Pill on Today ($18.40)
   const todayY = toY(histPoints[5]);
@@ -1207,9 +1207,12 @@ function drawMarketTrendsChart() {
 // 7. SIDEBAR TAB 1: CONGESTION & HISTORICAL FORECASTING
 // -------------------------------------------------------------
 
-window.selectForecastPort = function(portId) {
-  state.selectedForecastPort = portId;
-  renderDualForecastView();
+// The corridor dropdown drives the chart and the two model cards. Changing it does
+// not re-render the whole view: the chart is redrawn in place from the new response.
+window.selectForecastCorridor = function(corridorKey) {
+  if (window.FreightIQApi && window.FreightIQApi.selectCorridor) {
+    window.FreightIQApi.selectCorridor(corridorKey);
+  }
 };
 
 function renderDualForecastView() {
@@ -1217,87 +1220,64 @@ function renderDualForecastView() {
   if (!container) return;
 
   const m = getCalculatedMetrics();
-  const currentPortId = state.selectedForecastPort || "vizag";
-  const currentPort = state.portsIndia.find(p => p.id === currentPortId) || state.portsIndia[0];
-
-  const scoreFrac = (currentPort.congestion / 100).toFixed(2);
-  const isHighCongestion = currentPort.congestion >= 60;
-  const isModerate = currentPort.congestion >= 45 && currentPort.congestion < 60;
-  
-  // Dynamic 7-day rate momentum & impact
-  const rateImpactPct = ((currentPort.congestion - 45) * 0.22).toFixed(1);
-  const rateImpactSign = rateImpactPct >= 0 ? `+${rateImpactPct}%` : `${rateImpactPct}%`;
 
   container.innerHTML = `
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
       <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span class="text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200">
-            Congestion-Driven Telemetry Engine
+            Corridor Telemetry &amp; Model Forecast
           </span>
           <h2 class="text-2xl font-bold text-slate-900 mt-2 font-outfit">
-            Congestion-Based 7-Day Freight Forecaster
+            Observed Freight Rates with Model Forecast
           </h2>
           <p class="text-xs text-slate-500 mt-1">
-            Predicting 7-day spot rate risk curves directly tied to East Coast berth congestion scores and anchorage vessel queues.
+            Each point is a recorded weekly rate. The forecast is the deployed model's
+            14-day projection with its conformal interval, alongside Model 1's current
+            line-up snapshot for the discharge port.
           </p>
         </div>
         <button onclick="state.activeTab='dashboard'; renderApp();" class="text-xs bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium px-3.5 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 self-start md:self-auto">
-          ← Back to Route Query
+          \u2190 Back to Route Query
         </button>
       </div>
 
-      <!-- PORT TELEMETRY SELECTOR BAR -->
+      <!-- CORRIDOR SELECTOR BAR -->
       <div class="card-elevation p-4 bg-white rounded-2xl border border-slate-200 mb-6 shadow-xs">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-0.5">
-              Select East Coast Port Telemetry Dataset:
-            </label>
             <p class="text-xs text-slate-500">
-              Live port-specific queue telemetry updates the 7-day forecast line and regret bands dynamically.
+              The chart below is drawn from the model's own weekly observations and its
+              forecast interval. Corridors listed here are the only ones with recorded rates.
             </p>
           </div>
-          <select id="forecastPortSelect" onchange="window.selectForecastPort(this.value)" class="bg-slate-50 border border-slate-300 text-slate-900 text-xs font-bold rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer transition-colors shadow-2xs">
-            ${state.portsIndia.map(p => `
-              <option value="${p.id}" ${p.id === currentPortId ? 'selected' : ''}>
-                ${p.name} (${p.state}) — Congestion Score: ${p.congestion}/100 | Queue: ${p.waiting} vessels
-              </option>
-            `).join('')}
+          <select id="forecastCorridorSelect" onchange="window.selectForecastCorridor(this.value)"
+            class="bg-slate-50 border border-slate-300 text-slate-900 text-xs font-bold rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer transition-colors shadow-2xs">
+            <option value="">Loading corridors&hellip;</option>
           </select>
         </div>
+        <p id="forecastCorridorNote" class="text-[11px] text-slate-500 mt-2 leading-relaxed">&nbsp;</p>
       </div>
 
-      <!-- Forecaster Telemetry Metrics (Dynamic linked to selected port dataset) -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div class="card-elevation p-4 border-l-4 ${isHighCongestion ? 'border-rose-600 bg-rose-50/20' : isModerate ? 'border-amber-500 bg-amber-50/20' : 'border-emerald-500 bg-emerald-50/20'}">
-          <div class="text-xs text-slate-500 font-medium">${currentPort.name} Congestion Index</div>
-          <div class="text-2xl font-bold font-outfit ${isHighCongestion ? 'text-rose-700' : isModerate ? 'text-amber-700' : 'text-emerald-700'} mt-1">
-            ${scoreFrac} <span class="text-xs font-normal text-slate-500">/ 1.0 (${currentPort.congestion}%)</span>
+      <!-- Model output cards, filled from /api/corridor-series -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div class="card-elevation p-4 border-l-4 border-sky-600">
+          <div class="text-xs text-slate-500 font-medium">Discharge Port &mdash; Model 1 snapshot</div>
+          <div id="kpiCongestionValue" class="text-2xl font-bold text-slate-900 mt-1 font-outfit">
+            <span class="text-slate-400 text-base">Loading&hellip;</span>
           </div>
-          <div class="text-xs font-semibold mt-1 ${isHighCongestion ? 'text-rose-600' : isModerate ? 'text-amber-600' : 'text-emerald-600'}">
-            ${isHighCongestion ? '⚠️ High Berth Queue / Heavy Delay Risk' : isModerate ? '⚡ Moderate Queue Pressure' : '🟢 Fast Berth Turnover / Low Delay'}
+          <div id="kpiCongestionNote" class="text-xs font-semibold mt-1 text-slate-500">
+            &nbsp;
           </div>
         </div>
 
         <div class="card-elevation p-4 border-l-4 border-indigo-600">
-          <div class="text-xs text-slate-500 font-medium">7-Day Rate Forecast Trajectory</div>
-          <div class="text-2xl font-bold text-slate-900 mt-1 font-outfit">
-            ${rateImpactSign} 
-            <span class="text-xs font-normal ${rateImpactPct >= 0 ? 'text-rose-600' : 'text-emerald-600'}">${rateImpactPct >= 0 ? '▲ Upward Surcharge' : '▼ Rate Savings'}</span>
+          <div class="text-xs text-slate-500 font-medium">Model 2 &mdash; rate forecast</div>
+          <div id="kpiRateValue" class="text-2xl font-bold text-slate-900 mt-1 font-outfit">
+            <span class="text-slate-400 text-base">Loading&hellip;</span>
           </div>
-          <div class="text-xs font-medium mt-1 ${rateImpactPct >= 0 ? 'text-rose-600' : 'text-emerald-600'}">
-            ${rateImpactPct >= 0 ? 'Berth demurrage expected to drive 7-day spot pricing higher' : 'Smooth port discharge maintains stable baseline rates'}
-          </div>
-        </div>
-
-        <div class="card-elevation p-4 border-l-4 border-sky-600">
-          <div class="text-xs text-slate-500 font-medium">Anchorage Queue Telemetry</div>
-          <div class="text-2xl font-bold text-slate-900 mt-1 font-outfit">
-            ${currentPort.waiting} <span class="text-xs font-normal text-slate-500">ships in queue</span>
-          </div>
-          <div class="text-xs text-slate-600 font-medium mt-1">
-            Channel Draft: <strong>${currentPort.maxDraft}m</strong> | Max LOA: <strong>${currentPort.maxLoa}m</strong>
+          <div id="kpiRateNote" class="text-xs font-semibold mt-1 text-slate-500">
+            &nbsp;
           </div>
         </div>
       </div>
@@ -1307,53 +1287,45 @@ function renderDualForecastView() {
         <div class="lg:col-span-2 card-elevation p-6 bg-white rounded-2xl border border-slate-200">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
             <div>
-              <h3 class="font-bold text-slate-900 font-outfit text-base">
-                Coupled Freight Rate & Congestion Trajectory — ${currentPort.name}
+              <h3 class="font-bold text-slate-900 font-outfit text-base" id="chartTitle">
+                Observed Rate History and Model Forecast
               </h3>
-              <p class="text-xs text-slate-500">
-                7-Day to 60-Day dynamic projection generated from ${currentPort.name}'s congestion telemetry (${currentPort.congestion}%)
+              <p class="text-xs text-slate-500" id="chartSubtitle">
+                Weekly observed rates with the model's forecast and its 80% interval.
               </p>
             </div>
             <span class="text-[11px] font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full shrink-0">
-              Live Dataset Connected
+              GET /api/corridor-series
             </span>
           </div>
           <div class="relative w-full h-[300px]">
             <canvas id="dualForecastCanvas" class="w-full h-full"></canvas>
           </div>
+          <p id="chartFootnote" class="text-[11px] text-slate-500 mt-3 leading-relaxed">&nbsp;</p>
         </div>
 
         <div class="card-elevation p-6 bg-white rounded-2xl border border-slate-200 flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <h3 class="font-bold text-slate-900 font-outfit text-base">Model Telemetry & Backtest</h3>
-              <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Validated</span>
+              <h3 class="font-bold text-slate-900 font-outfit text-base">Model Evaluation</h3>
+              <span id="telemetryBadge" class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Loading</span>
             </div>
-            <p class="text-xs text-slate-500 mb-4">Empirical backtest metrics on historical East Coast fixtures:</p>
-            <div class="space-y-3 text-xs">
-              <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
-                <span class="text-slate-500">Forecast Error (MAE)</span>
-                <span class="font-bold text-slate-800">$0.62 / Ton</span>
-              </div>
-              <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
-                <span class="text-slate-500">Backtest Accuracy</span>
-                <span class="font-bold text-emerald-600">94.6%</span>
-              </div>
-              <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
-                <span class="text-slate-500">Primary Predictor</span>
-                <span class="font-bold text-slate-800">Berth Queue Index</span>
-              </div>
-              <div class="flex items-center justify-between py-1.5">
-                <span class="text-slate-500">Regret Loss Benefit</span>
-                <span class="font-bold text-teal-700">59.2% vs OLS</span>
-              </div>
+            <p class="text-xs text-slate-500 mb-4">
+              Served live from <span class="font-mono text-[11px]">GET /api/model-report</span>.
+              Every figure below is produced by the walk-forward validation, not hard-coded.
+            </p>
+            <div id="telemetryBody" class="space-y-3 text-xs">
+              <div class="text-slate-400 py-2">Contacting the model API&hellip;</div>
             </div>
           </div>
 
           <div class="mt-6 pt-3 border-t border-slate-100 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-            <div class="text-[11px] font-bold text-slate-700 mb-1">Port Summary (${currentPort.name}):</div>
+            <div class="text-[11px] font-bold text-slate-700 mb-1">What this chart does not show</div>
             <div class="text-[11px] text-slate-600 leading-relaxed">
-              ${currentPort.description}
+              No congestion trend is drawn. Model 1 reads a single line-up snapshot per
+              port and the dataset holds no congestion history, so any congestion curve
+              here would be invented. The current snapshot is reported in the card
+              above instead.
             </div>
           </div>
         </div>
@@ -1362,304 +1334,38 @@ function renderDualForecastView() {
   `;
 
   setTimeout(drawDualForecastCanvas, 50);
+  // Populate the live Model Evaluation panel once this view is in the DOM.
+  setTimeout(function () {
+    if (window.FreightIQApi && window.FreightIQApi.renderTelemetry) {
+      window.FreightIQApi.renderTelemetry();
+    }
+  }, 60);
+  // Draw the chart from the model, not from a curve written into this file.
+  if (window.FreightIQApi && window.FreightIQApi.renderCorridorChart) {
+    window.FreightIQApi.renderCorridorChart();
+  }
 }
 
+// The chart itself lives in api-status.js, because it is drawn from
+// GET /api/corridor-series rather than from data held in this file.
+//
+// What used to be here drew a 302-line synthetic chart: a hard-coded base rate of
+// $18.40, a four-point "history" spaced evenly around it, a five-point "forecast"
+// produced by the formula baseRate + (congestion - 45) * 0.22, "regret bounds"
+// computed as point +/- 0.6 with an arbitrary per-step widening, and an eight-point
+// congestion trajectory derived by multiplying the port's score by hand-picked
+// factors (0.52, 0.70, 0.85, ...). None of it came from a model.
+//
+// The replacement plots three real things and nothing else:
+//   - the weekly rates the corridor actually recorded, unmodified
+//   - the deployed model's 14-day point forecast
+//   - that forecast's conformal interval
+// There is no congestion line, because Model 1 reads a single line-up snapshot per
+// port and the dataset holds no congestion history to plot.
 function drawDualForecastCanvas() {
-  const canvas = document.getElementById("dualForecastCanvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-
-  const currentPortId = state.selectedForecastPort || "vizag";
-  const port = state.portsIndia.find(p => p.id === currentPortId) || state.portsIndia[0];
-  const c = port.congestion; // e.g., 72, 68, 52, 44, 42, 38, 30
-
-  // High DPI Rendering for Razor Sharp Clarity
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  const w = rect.width || canvas.parentElement?.clientWidth || 600;
-  const h = 300;
-
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  canvas.style.width = `${w}px`;
-  canvas.style.height = `${h}px`;
-
-  ctx.resetTransform?.();
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, w, h);
-
-  const padding = { top: 38, right: 65, bottom: 42, left: 60 };
-  const gw = w - padding.left - padding.right;
-  const gh = h - padding.top - padding.bottom;
-
-  const timeLabels = ["-30 Days", "-15 Days", "-7 Days", "Today", "+7 Days", "+14 Days", "+30 Days", "+60 Days"];
-
-  // DYNAMIC CONGESTION TRAJECTORY (%) based on port's score
-  const c0 = Math.max(12, Math.round(c * 0.52));
-  const c1 = Math.max(15, Math.round(c * 0.70));
-  const c2 = Math.max(20, Math.round(c * 0.85));
-  const c3 = c; // Today
-  const c4 = Math.min(96, Math.round(c * (1 + (c >= 60 ? 0.12 : c >= 45 ? 0.04 : -0.08))));
-  const c5 = Math.min(96, Math.round(c * (1 + (c >= 60 ? 0.22 : c >= 45 ? 0.07 : -0.12))));
-  const c6 = Math.min(96, Math.round(c * (1 + (c >= 60 ? 0.28 : c >= 45 ? 0.09 : -0.16))));
-  const c7 = Math.min(96, Math.round(c * (1 + (c >= 60 ? 0.32 : c >= 45 ? 0.10 : -0.20))));
-  const congestionVals = [c0, c1, c2, c3, c4, c5, c6, c7];
-
-  // DYNAMIC FREIGHT RATE TRAJECTORY ($/Ton)
-  const baseRate = 18.40;
-  const rateHist = [
-    parseFloat((baseRate - 1.2).toFixed(2)),
-    parseFloat((baseRate - 0.8).toFixed(2)),
-    parseFloat((baseRate - 0.4).toFixed(2)),
-    baseRate
-  ];
-
-  // Rate forecast delta per period linked to congestion deviation from 45% baseline
-  const congFactor = (c - 45) / 100;
-  const r0 = baseRate;
-  const r1 = parseFloat((baseRate + congFactor * 2.5).toFixed(2));
-  const r2 = parseFloat((baseRate + congFactor * 4.2).toFixed(2));
-  const r3 = parseFloat((baseRate + congFactor * 5.8).toFixed(2));
-  const r4 = parseFloat((baseRate + congFactor * 7.0).toFixed(2));
-  const rateForecast = [r0, r1, r2, r3, r4];
-
-  // Dynamic Regret Bounds
-  const lowerBounds = rateForecast.map((rf, idx) => parseFloat((rf - 0.6 - idx * 0.25).toFixed(2)));
-  const upperBounds = rateForecast.map((rf, idx) => parseFloat((rf + 0.8 + idx * (c >= 60 ? 0.85 : 0.45)).toFixed(2)));
-
-  // Y Scale Calculations
-  const allRates = [...rateHist, ...rateForecast, ...lowerBounds, ...upperBounds];
-  const minRateVal = Math.floor(Math.min(...allRates) - 1.0);
-  const maxRateVal = Math.ceil(Math.max(...allRates) + 1.0);
-
-  function getX(i) { return padding.left + (i / (timeLabels.length - 1)) * gw; }
-  function getRateY(v) { return padding.top + gh - ((v - minRateVal) / (maxRateVal - minRateVal)) * gh; }
-  function getCongY(pct) { return padding.top + gh - (pct / 100) * gh; }
-
-  // Background Fill & Grid
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(padding.left, padding.top, gw, gh);
-
-  // Left Y-Axis Header: Freight Rate
-  ctx.fillStyle = "#2563eb";
-  ctx.font = "bold 11px Inter, sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText("Rate ($/Ton)", padding.left - 45, padding.top - 18);
-
-  // Right Y-Axis Header: Congestion Score %
-  ctx.fillStyle = "#0d9488";
-  ctx.textAlign = "right";
-  ctx.fillText("Congestion Index (%)", padding.left + gw + 55, padding.top - 18);
-
-  // Horizontal Grid Lines & Dual Y-Labels
-  const stepRate = (maxRateVal - minRateVal) > 10 ? 2 : 1;
-  for (let rate = minRateVal; rate <= maxRateVal; rate += stepRate) {
-    const y = getRateY(rate);
-    ctx.strokeStyle = "#f1f5f9";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(padding.left, y);
-    ctx.lineTo(padding.left + gw, y);
-    ctx.stroke();
-
-    // Left label ($)
-    ctx.fillStyle = "#64748b";
-    ctx.font = "bold 10px 'JetBrains Mono', monospace";
-    ctx.textAlign = "right";
-    ctx.fillText(`$${rate.toFixed(1)}`, padding.left - 8, y + 3.5);
-
-    // Right label (% congestion)
-    const pctEquiv = Math.round(((rate - minRateVal) / (maxRateVal - minRateVal)) * 100);
-    ctx.fillStyle = "#0d9488";
-    ctx.textAlign = "left";
-    ctx.fillText(`${pctEquiv}%`, padding.left + gw + 8, y + 3.5);
+  if (window.FreightIQApi && window.FreightIQApi.drawSeriesChart) {
+    window.FreightIQApi.drawSeriesChart();
   }
-
-  // Shaded Asymmetric Regret Interval
-  const regretGrad = ctx.createLinearGradient(0, getRateY(maxRateVal), 0, getRateY(minRateVal));
-  regretGrad.addColorStop(0, "rgba(225, 29, 72, 0.22)");
-  regretGrad.addColorStop(1, "rgba(225, 29, 72, 0.03)");
-  ctx.fillStyle = regretGrad;
-  ctx.beginPath();
-  ctx.moveTo(getX(3), getRateY(upperBounds[0]));
-  for (let i = 0; i < upperBounds.length; i++) ctx.lineTo(getX(3 + i), getRateY(upperBounds[i]));
-  for (let i = lowerBounds.length - 1; i >= 0; i--) ctx.lineTo(getX(3 + i), getRateY(lowerBounds[i]));
-  ctx.closePath();
-  ctx.fill();
-
-  // Upper/Lower regret dash lines
-  ctx.strokeStyle = "rgba(225, 29, 72, 0.55)";
-  ctx.lineWidth = 1.3;
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath();
-  for (let i = 0; i < upperBounds.length; i++) {
-    if (i === 0) ctx.moveTo(getX(3 + i), getRateY(upperBounds[i]));
-    else ctx.lineTo(getX(3 + i), getRateY(upperBounds[i]));
-  }
-  ctx.stroke();
-  ctx.beginPath();
-  for (let i = 0; i < lowerBounds.length; i++) {
-    if (i === 0) ctx.moveTo(getX(3 + i), getRateY(lowerBounds[i]));
-    else ctx.lineTo(getX(3 + i), getRateY(lowerBounds[i]));
-  }
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Congestion Index Curve (Teal Line)
-  ctx.strokeStyle = "#0d9488";
-  ctx.lineWidth = 2.4;
-  ctx.setLineDash([4, 3]);
-  ctx.beginPath();
-  for (let i = 0; i < congestionVals.length; i++) {
-    const x = getX(i);
-    const y = getCongY(congestionVals[i]);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Congestion Dots
-  for (let i = 0; i < congestionVals.length; i++) {
-    const x = getX(i);
-    const y = getCongY(congestionVals[i]);
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "#0d9488";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(x, y, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  // Historical Rate Line (Blue Solid)
-  ctx.strokeStyle = "#2563eb";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  for (let i = 0; i < rateHist.length; i++) {
-    const x = getX(i);
-    const y = getRateY(rateHist[i]);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-
-  // Historical Dots
-  for (let i = 0; i < rateHist.length; i++) {
-    const x = getX(i);
-    const y = getRateY(rateHist[i]);
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "#2563eb";
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(x, y, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  // Forward Forecast Rate Line (Red Dashed)
-  ctx.strokeStyle = "#e11d48";
-  ctx.lineWidth = 3;
-  ctx.setLineDash([6, 4]);
-  ctx.beginPath();
-  for (let i = 0; i < rateForecast.length; i++) {
-    const x = getX(3 + i);
-    const y = getRateY(rateForecast[i]);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Forecast Dots
-  for (let i = 1; i < rateForecast.length; i++) {
-    const x = getX(3 + i);
-    const y = getRateY(rateForecast[i]);
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "#e11d48";
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(x, y, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  // Today Vertical Line & Pill
-  const todayX = getX(3);
-  ctx.strokeStyle = "#10b981";
-  ctx.lineWidth = 1.8;
-  ctx.setLineDash([3, 2]);
-  ctx.beginPath();
-  ctx.moveTo(todayX, padding.top);
-  ctx.lineTo(todayX, padding.top + gh);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Callout tag on Today
-  ctx.fillStyle = "#0f172a";
-  ctx.beginPath();
-  ctx.roundRect(todayX - 28, getRateY(r0) - 24, 56, 18, 4);
-  ctx.fill();
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 10px 'JetBrains Mono', monospace";
-  ctx.textAlign = "center";
-  ctx.fillText(`$${r0.toFixed(2)}`, todayX, getRateY(r0) - 12);
-
-  // Callout tag on +7 Days (Focus of 7-day forecast)
-  const d7X = getX(4);
-  ctx.fillStyle = c >= 50 ? "#e11d48" : "#059669";
-  ctx.beginPath();
-  ctx.roundRect(d7X - 35, getRateY(r1) - 24, 70, 18, 4);
-  ctx.fill();
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 10px 'JetBrains Mono', monospace";
-  ctx.textAlign = "center";
-  ctx.fillText(`$${r1.toFixed(2)} (+7d)`, d7X, getRateY(r1) - 12);
-
-  // X-Axis Time Labels
-  ctx.fillStyle = "#64748b";
-  ctx.font = "bold 10px Inter, sans-serif";
-  ctx.textAlign = "center";
-  for (let i = 0; i < timeLabels.length; i++) {
-    const isToday = i === 3;
-    const isD7 = i === 4;
-    ctx.fillStyle = isToday ? "#10b981" : isD7 ? "#e11d48" : "#64748b";
-    ctx.font = isD7 ? "bold 11px Inter, sans-serif" : "bold 10px Inter, sans-serif";
-    ctx.fillText(timeLabels[i], getX(i), padding.top + gh + 18);
-  }
-
-  // Legend
-  const legX = padding.left + gw - 330;
-  const legY = padding.top - 18;
-
-  ctx.fillStyle = "#2563eb";
-  ctx.fillRect(legX, legY, 12, 6);
-  ctx.fillStyle = "#334155";
-  ctx.font = "10px Inter, sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText("Rate Fix ($/T)", legX + 16, legY + 6);
-
-  ctx.strokeStyle = "#e11d48";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([3, 2]);
-  ctx.beginPath();
-  ctx.moveTo(legX + 85, legY + 3);
-  ctx.lineTo(legX + 100, legY + 3);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = "#334155";
-  ctx.fillText("7D Rate Forecast", legX + 104, legY + 6);
-
-  ctx.strokeStyle = "#0d9488";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([3, 2]);
-  ctx.beginPath();
-  ctx.moveTo(legX + 190, legY + 3);
-  ctx.lineTo(legX + 205, legY + 3);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = "#334155";
-  ctx.fillText("Congestion Index %", legX + 209, legY + 6);
 }
 
 // -------------------------------------------------------------
@@ -1684,7 +1390,7 @@ function renderRecommendationsView() {
           </h2>
         </div>
         <button onclick="state.activeTab='dashboard'; renderApp();" class="text-xs bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium px-3.5 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5">
-          ← Back to Route Query
+          \u2190 Back to Route Query
         </button>
       </div>
 
@@ -1694,19 +1400,35 @@ function renderRecommendationsView() {
           <div>
             <div class="flex items-center gap-2 mb-1">
               <span class="text-[11px] font-extrabold uppercase tracking-wider text-emerald-800 bg-emerald-100/80 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                Single Synthesized Recommendation · Optimal Choice
+                Single Synthesized Recommendation \u00b7 Optimal Choice
               </span>
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
             </div>
-            <h3 class="text-xl sm:text-2xl font-extrabold text-slate-900 font-outfit mt-1">
-              Lock Supramax Spot Charter on Corridor within 48 Hours
+            <h3 id="recoHeadline" class="text-xl sm:text-2xl font-extrabold text-slate-900 font-outfit mt-1">
+              Connecting to the recommendation engine&hellip;
             </h3>
-            <p class="text-[12px] sm:text-xs text-slate-600 mt-1.5 leading-relaxed max-w-2xl">
-              Booking within 48 hours protects against impending rate surges caused by rising berth lines and tight ship supply.<br class="hidden sm:inline"> Supramax vessels match East Coast port depths perfectly, ensuring direct discharge without waiting offshore.
+            <p id="recoNarrative" class="text-[12px] sm:text-xs text-slate-600 mt-1.5 leading-relaxed max-w-2xl">
+              &nbsp;
             </p>
             <p class="text-xs text-slate-500 mt-1">
-              Corridor: <strong class="text-slate-800">${state.query.origin}</strong> → <strong class="text-slate-800">${state.query.destination}</strong> (${m.distanceNm.toLocaleString()} NM)
+              Your route query: <strong class="text-slate-800">${state.query.origin}</strong> \u2192 <strong class="text-slate-800">${state.query.destination}</strong> (${m.distanceNm.toLocaleString()} NM)
             </p>
+
+            <!--
+              The panels below are driven by the trained models, which can only price
+              corridors that have observed weekly rate history. That set does not match
+              the port lists in the route form above, so the corridor under evaluation is
+              chosen here, from the real corridor list, rather than silently mapped.
+            -->
+            <div id="modelCorridorPicker" class="mt-3">
+              <select id="modelCorridorSelect"
+                class="text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 max-w-full">
+                <option value="">Loading corridor list&hellip;</option>
+              </select>
+              <p id="modelCorridorNote" class="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
+                &nbsp;
+              </p>
+            </div>
           </div>
           <!-- Space for Live Weather API Integration -->
           <div id="weatherApiSpace" class="p-3.5 bg-sky-50/70 border border-sky-200 rounded-xl shrink-0 min-w-[280px] md:max-w-sm">
@@ -1715,14 +1437,12 @@ function renderRecommendationsView() {
                 <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z"/></svg>
                 <span>Weather API Integration</span>
               </div>
-              <span class="text-[10px] font-semibold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-full border border-sky-200 flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Live Telemetry
+              <span id="weatherLiveBadge" class="text-[10px] font-semibold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-full border border-sky-200 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Offline
               </span>
             </div>
-            <div class="text-[11px] text-slate-600 space-y-1">
-              <div class="flex justify-between"><span>Wind / Velocity:</span><strong class="text-amber-700 font-mono">28 kts (Squally)</strong></div>
-              <div class="flex justify-between"><span>Swell / Sea State:</span><strong class="text-slate-800 font-mono">2.4 m · Moderate</strong></div>
-              <div class="flex justify-between"><span>Route Advisory:</span><strong class="text-rose-600 font-semibold">Active Monsoon Precaution</strong></div>
+            <div id="recoWeather" class="text-[11px] text-slate-600 space-y-1">
+              <div class="text-slate-400">No observation yet.</div>
             </div>
           </div>
         </div>
@@ -1735,15 +1455,11 @@ function renderRecommendationsView() {
             <div>
               <div class="flex items-center justify-between mb-2">
                 <span class="text-xs font-bold uppercase tracking-wider text-blue-700">1. Optimal Market Entry</span>
-                <span class="text-[11px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Lock-in Window: Immediate</span>
+                <span id="marketEntryBadge" class="text-[11px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Connecting&hellip;</span>
               </div>
-              <p class="text-xs text-slate-700 leading-relaxed">
-                Freight rates are projected to increase over the next two weeks as port lines get busier. Booking now locks in current lower rates and prevents paying extra congestion charges.
-              </p>
-              <div class="mt-3 text-xs space-y-2 text-slate-600">
-                <div class="flex justify-between"><span>Port Traffic Status:</span><strong class="text-slate-800">Moderate Line (Berths filling up)</strong></div>
-                <div class="flex justify-between"><span>14-Day Freight Trend:</span><strong class="text-rose-600">Rising (+8.4%)</strong></div>
-                <div class="flex justify-between"><span>Expected Savings:</span><strong class="text-emerald-700 font-bold">~$2.80 saved per ton</strong></div>
+              <p id="marketEntryWhy" class="text-xs text-slate-700 leading-relaxed">&nbsp;</p>
+              <div id="marketEntryRows" class="mt-3 text-xs space-y-2 text-slate-600">
+                <div class="text-slate-400">Waiting for model output&hellip;</div>
               </div>
             </div>
           </div>
@@ -1753,15 +1469,11 @@ function renderRecommendationsView() {
             <div>
               <div class="flex items-center justify-between mb-2">
                 <span class="text-xs font-bold uppercase tracking-wider text-emerald-700">2. Vessel Optimizer</span>
-                <span class="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">Optimal Vessel Fit</span>
+                <span id="vesselBadge" class="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">Connecting&hellip;</span>
               </div>
-              <p class="text-xs text-slate-700 leading-relaxed">
-                <strong>Supramax (55,000 MT)</strong> is the best ship size for this route. It fits easily into East Coast port water depths and berth lengths, avoiding costly offshore transfers and waiting penalties.
-              </p>
-              <div class="mt-3 text-xs space-y-2 text-slate-600">
-                <div class="flex justify-between"><span>Water Depth (Draft):</span><strong class="text-emerald-700 font-bold">✓ Fits safely (12.5m ≤ 14.5m limit)</strong></div>
-                <div class="flex justify-between"><span>Ship Length:</span><strong class="text-emerald-700 font-bold">✓ Fits comfortably (190m ≤ 295m max)</strong></div>
-                <div class="flex justify-between"><span>Cargo Handling:</span><strong class="text-emerald-700 font-bold">✓ Onboard cranes allow direct unloading</strong></div>
+              <p id="vesselWhy" class="text-xs text-slate-700 leading-relaxed">&nbsp;</p>
+              <div id="vesselRows" class="mt-3 text-xs space-y-2 text-slate-600">
+                <div class="text-slate-400">Waiting for model output&hellip;</div>
               </div>
             </div>
           </div>
@@ -1771,15 +1483,11 @@ function renderRecommendationsView() {
             <div>
               <div class="flex items-center justify-between mb-2">
                 <span class="text-xs font-bold uppercase tracking-wider text-amber-800">3. Risk Monitor</span>
-                <span class="text-[11px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded">Risk Level: Controlled</span>
+                <span id="riskBadge" class="text-[11px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded">Connecting&hellip;</span>
               </div>
-              <p class="text-xs text-slate-700 leading-relaxed">
-                Ships are currently waiting about 4 days at port berths, and coastal winds may slow cargo unloading. Planning a 2 to 3 day arrival buffer prevents unexpected delay penalties.
-              </p>
-              <div class="mt-3 text-xs space-y-2 text-slate-600">
-                <div class="flex justify-between"><span>Estimated Berth Wait:</span><strong class="text-amber-700">~4 Days in queue</strong></div>
-                <div class="flex justify-between"><span>Local Plant Demand:</span><strong class="text-slate-800">High (Replenishing inventory)</strong></div>
-                <div class="flex justify-between"><span>Coastal Weather Alert:</span><strong class="text-amber-700">Moderate winds (Buffer advised)</strong></div>
+              <p id="riskWhy" class="text-xs text-slate-700 leading-relaxed">&nbsp;</p>
+              <div id="riskRows" class="mt-3 text-xs space-y-2 text-slate-600">
+                <div class="text-slate-400">Waiting for model output&hellip;</div>
               </div>
             </div>
           </div>
@@ -1795,6 +1503,11 @@ function renderRecommendationsView() {
               Explainability AI
             </span>
           </div>
+        </div>
+
+        <!-- LIVE narrative, written only from model output -->
+        <div id="explainLive" class="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div class="text-xs text-slate-400">Composing the rationale&hellip;</div>
         </div>
 
         <!-- Subheadings with Points in Simpler Language -->
@@ -1856,7 +1569,7 @@ function renderRecommendationsView() {
             </p>
             <ul class="text-xs text-slate-600 space-y-2 list-disc list-inside leading-relaxed">
               <li><strong>Monsoon & Swell Impacts:</strong> High waves and gusty winds suspend pilot boarding and slow conveyor transfer speeds.</li>
-              <li><strong>Arrival Buffers:</strong> Factoring weather forecasts allows charterers to agree on flexible 2–3 day arrival windows (laycans) to prevent costly dispute claims.</li>
+              <li><strong>Arrival Buffers:</strong> Factoring weather forecasts allows charterers to agree on flexible 2\u20133 day arrival windows (laycans) to prevent costly dispute claims.</li>
             </ul>
           </div>
 
@@ -1865,10 +1578,20 @@ function renderRecommendationsView() {
 
     </div>
   `;
+
+  // The three pillars above used to contain numbers typed straight into this file
+  // ("+8.4%", "~$2.80 saved per ton", "~4 Days in queue", "12.5m <= 14.5m"). They are
+  // now placeholders. Ask the backend what the models actually say and fill them in.
+  // If the backend is down the placeholders keep their "unavailable" wording - we
+  // never fall back to a plausible-looking number.
+  if (window.FreightIQApi && window.FreightIQApi.renderRecommendation) {
+    window.FreightIQApi.renderRecommendation();
+  }
 }
 
 // -------------------------------------------------------------
 // 9. SIDEBAR TAB 3: IDLE SCENARIO ANALYSIS (INDIAN EAST COAST PORTS CONGESTION-BASED ALLOTMENT)
+// -------------------------------------------------------------
 // -------------------------------------------------------------
 
 window.selectIdlePort = function(portId) {
@@ -1903,10 +1626,10 @@ function renderIdleAnalysisView() {
         state: "Andhra Pradesh",
         congestion: 44,
         distance: "25 km",
-        traffic: "Low Congestion · Fast Clearance",
+        traffic: "Low Congestion \u00b7 Fast Clearance",
         cargo: "Coke & Steel Plant Billets",
         slots: 25,
-        pay: "₹2,800 – ₹3,400 / day",
+        pay: "\u20b92,800 \u2013 \u20b93,400 / day",
         color: "emerald"
       },
       {
@@ -1914,10 +1637,10 @@ function renderIdleAnalysisView() {
         state: "Odisha",
         congestion: 30,
         distance: "210 km",
-        traffic: "Lowest East Coast Congestion · High Demand",
+        traffic: "Lowest East Coast Congestion \u00b7 High Demand",
         cargo: "Imported Coal & Mineral Rakes",
         slots: 20,
-        pay: "₹4,500 – ₹5,400 / trip",
+        pay: "\u20b94,500 \u2013 \u20b95,400 / trip",
         color: "blue"
       },
       {
@@ -1928,7 +1651,7 @@ function renderIdleAnalysisView() {
         traffic: "Rapid Rail-to-Conveyor Turnaround",
         cargo: "Thermal Coal & Pellets",
         slots: 20,
-        pay: "₹5,800 – ₹6,500 / trip",
+        pay: "\u20b95,800 \u2013 \u20b96,500 / trip",
         color: "indigo"
       }
     ];
@@ -1939,10 +1662,10 @@ function renderIdleAnalysisView() {
         state: "Odisha",
         congestion: 38,
         distance: "98 km",
-        traffic: "Low Congestion · Rapid Mechanized Loading",
+        traffic: "Low Congestion \u00b7 Rapid Mechanized Loading",
         cargo: "Iron Ore Pellets & Bulk Coal",
         slots: 40,
-        pay: "₹3,800 – ₹4,600 / trip",
+        pay: "\u20b93,800 \u2013 \u20b94,600 / trip",
         color: "emerald"
       },
       {
@@ -1950,10 +1673,10 @@ function renderIdleAnalysisView() {
         state: "Odisha",
         congestion: 30,
         distance: "175 km",
-        traffic: "Lowest Congestion · Fast Berthing",
+        traffic: "Lowest Congestion \u00b7 Fast Berthing",
         cargo: "Heavy Industrial Minerals",
         slots: 35,
-        pay: "₹4,200 – ₹5,000 / trip",
+        pay: "\u20b94,200 \u2013 \u20b95,000 / trip",
         color: "blue"
       },
       {
@@ -1964,7 +1687,7 @@ function renderIdleAnalysisView() {
         traffic: "Deepwater Capesize Dispatch",
         cargo: "Finished Steel & Coking Coal",
         slots: 30,
-        pay: "₹5,200 – ₹6,000 / trip",
+        pay: "\u20b95,200 \u2013 \u20b96,000 / trip",
         color: "indigo"
       }
     ];
@@ -1975,10 +1698,10 @@ function renderIdleAnalysisView() {
         state: "Odisha",
         congestion: 38,
         distance: "195 km",
-        traffic: "Deep Draft · High Conveyor Loading",
+        traffic: "Deep Draft \u00b7 High Conveyor Loading",
         cargo: "Imported Thermal Coal",
         slots: 45,
-        pay: "₹4,600 – ₹5,500 / trip",
+        pay: "\u20b94,600 \u2013 \u20b95,500 / trip",
         color: "emerald"
       },
       {
@@ -1989,7 +1712,7 @@ function renderIdleAnalysisView() {
         traffic: "Active Maritime Staging Gate",
         cargo: "Lighterage Cargo & Bagged Feedstock",
         slots: 30,
-        pay: "₹3,200 – ₹4,000 / trip",
+        pay: "\u20b93,200 \u2013 \u20b94,000 / trip",
         color: "blue"
       },
       {
@@ -2000,7 +1723,7 @@ function renderIdleAnalysisView() {
         traffic: "Bulk Coal Rakes Dispatch",
         cargo: "Mechanized Pellets",
         slots: 25,
-        pay: "₹4,800 – ₹5,800 / trip",
+        pay: "\u20b94,800 \u2013 \u20b95,800 / trip",
         color: "amber"
       }
     ];
@@ -2015,11 +1738,11 @@ function renderIdleAnalysisView() {
       name: p.name,
       state: p.state,
       congestion: p.congestion,
-      distance: "120 – 350 km",
-      traffic: p.congestion < 50 ? "Low Congestion · High Truck Need" : "Moderate Demand",
+      distance: "120 \u2013 350 km",
+      traffic: p.congestion < 50 ? "Low Congestion \u00b7 High Truck Need" : "Moderate Demand",
       cargo: "Bulk Minerals & Steel Coils",
       slots: 25,
-      pay: "₹3,500 – ₹4,800 / trip",
+      pay: "\u20b93,500 \u2013 \u20b94,800 / trip",
       color: "emerald"
     }));
   }
@@ -2043,7 +1766,7 @@ function renderIdleAnalysisView() {
           </h2>
         </div>
         <button onclick="state.activeTab='dashboard'; renderApp();" class="text-xs bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium px-3.5 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 self-start md:self-auto">
-          ← Back to Route Query
+          \u2190 Back to Route Query
         </button>
       </div>
 
@@ -2051,7 +1774,7 @@ function renderIdleAnalysisView() {
       <div class="card-elevation p-5 bg-gradient-to-r from-amber-50 via-white to-sky-50 rounded-2xl border border-amber-200/80 mb-6">
         <div class="flex flex-col md:flex-row items-start md:items-center gap-4">
           <div class="w-12 h-12 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-2xl shrink-0 shadow-sm">
-            🚛
+            \u1f69b
           </div>
           <div class="flex-1">
             <h3 class="text-base font-bold text-slate-900 font-outfit">
@@ -2060,7 +1783,7 @@ function renderIdleAnalysisView() {
             <p class="text-xs text-slate-600 mt-1 leading-relaxed">
               When an Indian East Coast port has a <strong>high congestion score</strong>, ships face long berthing queues and cargo cannot be unloaded. 
               Local dock truck drivers arrive at the gates only to find loading halted. 
-              <strong>Deadheading</strong> occurs when a driver has to drive back empty—losing fuel and earning zero daily income. 
+              <strong>Deadheading</strong> occurs when a driver has to drive back empty\u2014losing fuel and earning zero daily income. 
               By continuously evaluating each East Coast port's congestion score, FreightIQ detects loading drops days in advance and 
               <strong>allots empty trucks to neighboring low-congestion ports</strong> that have ready cargo and an acute truck shortage.
             </p>
@@ -2117,7 +1840,7 @@ function renderIdleAnalysisView() {
                 <div class="mt-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border inline-block ${scoreBg}">
                   ${statusLabel}
                 </div>
-                ${isSelected ? '<div class="absolute -top-1.5 -right-1.5 bg-blue-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold">✓</div>' : ''}
+                ${isSelected ? '<div class="absolute -top-1.5 -right-1.5 bg-blue-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold">\u2713</div>' : ''}
               </button>
             `;
           }).join('')}
@@ -2135,7 +1858,7 @@ function renderIdleAnalysisView() {
               <span class="text-xs text-slate-500">${currentPort.state}, India</span>
             </div>
             <h3 class="text-xl font-bold text-slate-900 font-outfit">
-              ${currentPort.name} — Congestion Diagnostic & Idle Risk
+              ${currentPort.name} \u2014 Congestion Diagnostic & Idle Risk
             </h3>
             <p class="text-xs text-slate-500 mt-0.5">
               ${currentPort.description}
@@ -2182,7 +1905,7 @@ function renderIdleAnalysisView() {
                   <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                 </div>
                 <div class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded inline-block mb-1.5">
-                  🟢 Normal Loading
+                  \u1f7e2 Normal Loading
                 </div>
                 <div class="text-[11px] text-slate-600 space-y-0.5">
                   <div>Cargo: <strong>12,400 MT</strong></div>
@@ -2190,7 +1913,7 @@ function renderIdleAnalysisView() {
                 </div>
               </div>
               <div class="mt-2.5 pt-1.5 border-t border-slate-200 text-[10px] text-emerald-700 font-medium">
-                ✓ Full employment
+                \u2713 Full employment
               </div>
             </div>
 
@@ -2202,7 +1925,7 @@ function renderIdleAnalysisView() {
                   <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                 </div>
                 <div class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded inline-block mb-1.5">
-                  🟢 Normal Loading
+                  \u1f7e2 Normal Loading
                 </div>
                 <div class="text-[11px] text-slate-600 space-y-0.5">
                   <div>Cargo: <strong>11,800 MT</strong></div>
@@ -2210,7 +1933,7 @@ function renderIdleAnalysisView() {
                 </div>
               </div>
               <div class="mt-2.5 pt-1.5 border-t border-slate-200 text-[10px] text-emerald-700 font-medium">
-                ✓ Full employment
+                \u2713 Full employment
               </div>
             </div>
 
@@ -2223,7 +1946,7 @@ function renderIdleAnalysisView() {
                     <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
                   </div>
                   <div class="text-[10px] font-extrabold text-rose-800 bg-rose-100 px-1.5 py-0.5 rounded inline-block mb-1.5">
-                    ⚠️ -52% Cargo Drop
+                    \u26a0\ufe0f -52% Cargo Drop
                   </div>
                   <div class="text-[11px] text-slate-700 space-y-0.5">
                     <div>Cargo: <strong class="text-rose-600">5,800 MT only</strong></div>
@@ -2232,7 +1955,7 @@ function renderIdleAnalysisView() {
                   </div>
                 </div>
                 <div class="mt-2.5 pt-1.5 border-t border-rose-200 text-[10px] text-rose-800 font-bold">
-                  🚨 Re-allotment needed
+                  \u1f6a8 Re-allotment needed
                 </div>
               </div>
             ` : `
@@ -2243,7 +1966,7 @@ function renderIdleAnalysisView() {
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                   </div>
                   <div class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded inline-block mb-1.5">
-                    🟢 Normal Flow
+                    \u1f7e2 Normal Flow
                   </div>
                   <div class="text-[11px] text-slate-600 space-y-0.5">
                     <div>Cargo: <strong>14,100 MT</strong></div>
@@ -2251,7 +1974,7 @@ function renderIdleAnalysisView() {
                   </div>
                 </div>
                 <div class="mt-2.5 pt-1.5 border-t border-slate-200 text-[10px] text-emerald-700 font-medium">
-                  ✓ High Demand
+                  \u2713 High Demand
                 </div>
               </div>
             `}
@@ -2265,7 +1988,7 @@ function renderIdleAnalysisView() {
                     <span class="w-2 h-2 rounded-full bg-amber-500"></span>
                   </div>
                   <div class="text-[10px] font-extrabold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded inline-block mb-1.5">
-                    ⚠️ -35% Loading
+                    \u26a0\ufe0f -35% Loading
                   </div>
                   <div class="text-[11px] text-slate-700 space-y-0.5">
                     <div>Cargo: <strong class="text-amber-700">7,900 MT</strong></div>
@@ -2274,7 +1997,7 @@ function renderIdleAnalysisView() {
                   </div>
                 </div>
                 <div class="mt-2.5 pt-1.5 border-t border-amber-200 text-[10px] text-amber-800 font-bold">
-                  ⚠️ Re-allotment needed
+                  \u26a0\ufe0f Re-allotment needed
                 </div>
               </div>
             ` : `
@@ -2285,7 +2008,7 @@ function renderIdleAnalysisView() {
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                   </div>
                   <div class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded inline-block mb-1.5">
-                    🟢 Normal Flow
+                    \u1f7e2 Normal Flow
                   </div>
                   <div class="text-[11px] text-slate-600 space-y-0.5">
                     <div>Cargo: <strong>13,500 MT</strong></div>
@@ -2293,7 +2016,7 @@ function renderIdleAnalysisView() {
                   </div>
                 </div>
                 <div class="mt-2.5 pt-1.5 border-t border-slate-200 text-[10px] text-emerald-700 font-medium">
-                  ✓ High Demand
+                  \u2713 High Demand
                 </div>
               </div>
             `}
@@ -2306,7 +2029,7 @@ function renderIdleAnalysisView() {
                   <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                 </div>
                 <div class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded inline-block mb-1.5">
-                  🟢 Volume Normalized
+                  \u1f7e2 Volume Normalized
                 </div>
                 <div class="text-[11px] text-slate-600 space-y-0.5">
                   <div>Cargo: <strong>13,200 MT</strong></div>
@@ -2314,7 +2037,7 @@ function renderIdleAnalysisView() {
                 </div>
               </div>
               <div class="mt-2.5 pt-1.5 border-t border-slate-200 text-[10px] text-emerald-700 font-medium">
-                ✓ Full employment
+                \u2713 Full employment
               </div>
             </div>
 
@@ -2326,7 +2049,7 @@ function renderIdleAnalysisView() {
                   <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                 </div>
                 <div class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded inline-block mb-1.5">
-                  🟢 Normal Loading
+                  \u1f7e2 Normal Loading
                 </div>
                 <div class="text-[11px] text-slate-600 space-y-0.5">
                   <div>Cargo: <strong>12,000 MT</strong></div>
@@ -2334,7 +2057,7 @@ function renderIdleAnalysisView() {
                 </div>
               </div>
               <div class="mt-2.5 pt-1.5 border-t border-slate-200 text-[10px] text-emerald-700 font-medium">
-                ✓ Full employment
+                \u2713 Full employment
               </div>
             </div>
 
@@ -2346,7 +2069,7 @@ function renderIdleAnalysisView() {
                   <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                 </div>
                 <div class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded inline-block mb-1.5">
-                  🟢 Normal Loading
+                  \u1f7e2 Normal Loading
                 </div>
                 <div class="text-[11px] text-slate-600 space-y-0.5">
                   <div>Cargo: <strong>12,600 MT</strong></div>
@@ -2354,7 +2077,7 @@ function renderIdleAnalysisView() {
                 </div>
               </div>
               <div class="mt-2.5 pt-1.5 border-t border-slate-200 text-[10px] text-emerald-700 font-medium">
-                ✓ Full employment
+                \u2713 Full employment
               </div>
             </div>
 
@@ -2380,7 +2103,7 @@ function renderIdleAnalysisView() {
             </p>
           </div>
           <div class="flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 shrink-0">
-            <span>✓ ${totalIdleRisk} Empty Trucks Can Be Reassigned Today</span>
+            <span>\u2713 ${totalIdleRisk} Empty Trucks Can Be Reassigned Today</span>
           </div>
         </div>
 
@@ -2424,7 +2147,7 @@ function renderIdleAnalysisView() {
 
               <div class="mt-5 pt-3 border-t border-slate-200">
                 <button onclick="allotTrucksToPort('${opt.name}', ${opt.slots})" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2.5 rounded-xl transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer">
-                  <span>Allot ${opt.slots} Trucks to ${opt.name.split(' ')[0]} →</span>
+                  <span>Allot ${opt.slots} Trucks to ${opt.name.split(' ')[0]} \u2192</span>
                 </button>
               </div>
             </div>
@@ -2448,7 +2171,7 @@ function renderIdleAnalysisView() {
 
         <div class="card-elevation p-5 bg-white rounded-xl border-l-4 border-amber-500">
           <div class="text-xs text-slate-500 font-medium">Average Daily Income Secured</div>
-          <div class="text-2xl font-bold text-slate-900 font-outfit mt-1">₹4,250 <span class="text-xs font-normal text-slate-500">/ driver</span></div>
+          <div class="text-2xl font-bold text-slate-900 font-outfit mt-1">\u20b94,250 <span class="text-xs font-normal text-slate-500">/ driver</span></div>
           <div class="text-xs text-amber-700 mt-1 font-semibold">Guaranteed minimum daily livelihood protection</div>
         </div>
       </div>
@@ -2480,7 +2203,7 @@ function renderPortMapView() {
           </p>
         </div>
         <button onclick="state.activeTab='dashboard'; renderApp();" class="text-xs bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium px-3 py-2 rounded-lg transition-colors shadow-sm">
-          ← Back to Route Query
+          \u2190 Back to Route Query
         </button>
       </div>
 
@@ -2491,7 +2214,7 @@ function renderPortMapView() {
             <h3 class="font-bold text-slate-800 font-outfit text-sm">East Coast Gateways & Sandheads Anchorage</h3>
             <div class="flex items-center gap-3 text-xs">
               <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Normal (< 50)</span>
-              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Congested (≥ 65)</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Congested (\u2265 65)</span>
             </div>
           </div>
 
@@ -2528,12 +2251,12 @@ function renderPortMapView() {
                 <line x1="0" y1="530" x2="560" y2="530" />
                 <line x1="0" y1="650" x2="560" y2="650" />
               </g>
-              <text x="548" y="84" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="end" font-family="'JetBrains Mono', monospace">22°N</text>
-              <text x="548" y="184" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="end" font-family="'JetBrains Mono', monospace">21°N</text>
-              <text x="548" y="294" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="end" font-family="'JetBrains Mono', monospace">20°N</text>
-              <text x="548" y="414" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="end" font-family="'JetBrains Mono', monospace">19°N</text>
-              <text x="548" y="534" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="end" font-family="'JetBrains Mono', monospace">18°N</text>
-              <text x="548" y="654" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="end" font-family="'JetBrains Mono', monospace">17°N</text>
+              <text x="548" y="84" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="end" font-family="'JetBrains Mono', monospace">22\u00b0N</text>
+              <text x="548" y="184" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="end" font-family="'JetBrains Mono', monospace">21\u00b0N</text>
+              <text x="548" y="294" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="end" font-family="'JetBrains Mono', monospace">20\u00b0N</text>
+              <text x="548" y="414" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="end" font-family="'JetBrains Mono', monospace">19\u00b0N</text>
+              <text x="548" y="534" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="end" font-family="'JetBrains Mono', monospace">18\u00b0N</text>
+              <text x="548" y="654" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="end" font-family="'JetBrains Mono', monospace">17\u00b0N</text>
 
               <!-- Longitude Meridians -->
               <g stroke="rgba(255,255,255,0.07)" stroke-width="0.8" stroke-dasharray="2,3">
@@ -2541,9 +2264,9 @@ function renderPortMapView() {
                 <line x1="300" y1="0" x2="300" y2="720" />
                 <line x1="440" y1="0" x2="440" y2="720" />
               </g>
-              <text x="160" y="712" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="middle" font-family="'JetBrains Mono', monospace">84°E</text>
-              <text x="300" y="712" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="middle" font-family="'JetBrains Mono', monospace">86°E</text>
-              <text x="440" y="712" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="middle" font-family="'JetBrains Mono', monospace">88°E</text>
+              <text x="160" y="712" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="middle" font-family="'JetBrains Mono', monospace">84\u00b0E</text>
+              <text x="300" y="712" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="middle" font-family="'JetBrains Mono', monospace">86\u00b0E</text>
+              <text x="440" y="712" font-size="8" fill="rgba(148,163,184,0.6)" text-anchor="middle" font-family="'JetBrains Mono', monospace">88\u00b0E</text>
 
               <!-- Bathymetric Shelf Depth Contours (10m, 20m, 50m, 100m) -->
               <!-- 20m Depth Contour -->
@@ -2661,7 +2384,7 @@ function renderPortMapView() {
                 <circle cx="425" cy="215" r="9" fill="#f59e0b" stroke="#ffffff" stroke-width="2"/>
                 <circle cx="425" cy="215" r="16" fill="none" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="3,3" class="animate-spin"/>
                 <rect x="365" y="235" width="150" height="22" rx="5" fill="#0f172a" stroke="#f59e0b" stroke-width="1.2"/>
-                <text x="440" y="250" font-size="10" font-weight="extrabold" fill="#fbbf24" text-anchor="middle">Sandheads Anchorage ⚓ (16m)</text>
+                <text x="440" y="250" font-size="10" font-weight="extrabold" fill="#fbbf24" text-anchor="middle">Sandheads Anchorage \u2693 (16m)</text>
               </g>
 
               <!-- 3. DHAMRA PORT (Odisha - Capesize Deepwater Gateway) -->
@@ -2676,7 +2399,7 @@ function renderPortMapView() {
                 <circle cx="322" cy="308" r="9" fill="#f59e0b" stroke="#ffffff" stroke-width="2"/>
                 <circle cx="322" cy="308" r="17" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2,2"/>
                 <rect x="338" y="298" width="128" height="22" rx="5" fill="#0f172a" stroke="#f59e0b" stroke-width="1.2"/>
-                <text x="402" y="313" font-size="10" font-weight="extrabold" fill="#fbbf24" text-anchor="middle">Paradip Port (14.5m) ⚠️</text>
+                <text x="402" y="313" font-size="10" font-weight="extrabold" fill="#fbbf24" text-anchor="middle">Paradip Port (14.5m) \u26a0\ufe0f</text>
               </g>
 
               <!-- 5. GOPALPUR PORT (Odisha - Deepwater Mineral Gateway) -->
@@ -2691,7 +2414,7 @@ function renderPortMapView() {
                 <circle cx="138" cy="565" r="9.5" fill="#ef4444" stroke="#ffffff" stroke-width="2.5"/>
                 <circle cx="138" cy="565" r="18" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="3,2"/>
                 <rect x="155" y="554" width="135" height="22" rx="5" fill="#0f172a" stroke="#ef4444" stroke-width="1.4"/>
-                <text x="222" y="569" font-size="10" font-weight="extrabold" fill="#fca5a5" text-anchor="middle">Vizag Port (18.0m) 🔴</text>
+                <text x="222" y="569" font-size="10" font-weight="extrabold" fill="#fca5a5" text-anchor="middle">Vizag Port (18.0m) \u1f534</text>
               </g>
 
               <!-- 7. GANGAVARAM PORT (Andhra Pradesh - India's Deepest Port 21m) -->
@@ -2731,7 +2454,7 @@ function renderPortMapView() {
                 Port Operational Dossier
               </span>
               <h3 class="font-bold text-slate-900 font-outfit text-xl mt-2" id="mapPortName">Visakhapatnam (Vizag)</h3>
-              <p class="text-xs text-slate-500" id="mapPortState">Andhra Pradesh · Natural Deepwater Harbour</p>
+              <p class="text-xs text-slate-500" id="mapPortState">Andhra Pradesh \u00b7 Natural Deepwater Harbour</p>
             </div>
 
             <!-- Detailed Operational Description Provided by User -->
@@ -2792,7 +2515,7 @@ window.selectPortFromMap = function (portId) {
   const suggestionBox = document.getElementById("portCongestionSuggestionBox");
 
   if (nameEl) nameEl.textContent = p.name;
-  if (stateEl) stateEl.textContent = `${p.state} · East Coast Maritime Hub`;
+  if (stateEl) stateEl.textContent = `${p.state} \u00b7 East Coast Maritime Hub`;
   if (descEl) descEl.textContent = p.description;
   if (draftEl) draftEl.textContent = `${p.maxDraft} Metres`;
   if (loaEl) loaEl.textContent = `${p.maxLoa} Metres`;
@@ -2895,7 +2618,7 @@ function getDefaultModelHistorySeed() {
       role: "Senior Charterer / Dry Bulk Desk",
       action: "Freight Rate Valuation",
       category: "valuation",
-      origin: "Australia — Newcastle - Kooragang",
+      origin: "Australia \u2014 Newcastle - Kooragang",
       originCountry: "Australia",
       destination: "Vizag",
       destinationState: "Andhra Pradesh",
@@ -2938,7 +2661,7 @@ function getDefaultModelHistorySeed() {
       role: "Marine Logistics Officer",
       action: "Scenario Stress Test",
       category: "scenario",
-      origin: "United States — Norfolk - Lamberts Point Pier 6",
+      origin: "United States \u2014 Norfolk - Lamberts Point Pier 6",
       originCountry: "United States",
       destination: "Paradip",
       destinationState: "Odisha",
@@ -2981,7 +2704,7 @@ function getDefaultModelHistorySeed() {
       role: "Senior Charterer / Dry Bulk Desk",
       action: "Vessel Optimization",
       category: "vessel",
-      origin: "Indonesia — Taboneo (Banjarmasin anchorage)",
+      origin: "Indonesia \u2014 Taboneo (Banjarmasin anchorage)",
       originCountry: "Indonesia",
       destination: "Haldia",
       destinationState: "West Bengal",
@@ -3024,7 +2747,7 @@ function getDefaultModelHistorySeed() {
       role: "Central Raw Material Desk",
       action: "Freight Rate Valuation",
       category: "valuation",
-      origin: "Russia — Vostochny",
+      origin: "Russia \u2014 Vostochny",
       originCountry: "Russia",
       destination: "Dhamra",
       destinationState: "Odisha",
@@ -3067,7 +2790,7 @@ function getDefaultModelHistorySeed() {
       role: "Discharge Port Coordinator",
       action: "Port Gateway Selection",
       category: "port",
-      origin: "Australia — Hay Point Coal Terminal",
+      origin: "Australia \u2014 Hay Point Coal Terminal",
       originCountry: "Australia",
       destination: "Gangavaram",
       destinationState: "Andhra Pradesh",
@@ -3089,7 +2812,7 @@ function getDefaultModelHistorySeed() {
       queueWaitHours: 26.4,
       waitingVessels: 5,
       confidenceScore: "95.5%",
-      verdict: "LOW DEMURRAGE RISK — PROCEED",
+      verdict: "LOW DEMURRAGE RISK \u2014 PROCEED",
       verdictBadge: "Low Demurrage",
       bunkerConsumptionMT: 585,
       bunkerPriceUSD: 615,
@@ -3110,7 +2833,7 @@ function getDefaultModelHistorySeed() {
       role: "Marine Logistics Officer",
       action: "Fleet Repositioning Simulation",
       category: "scenario",
-      origin: "Mozambique — Beira",
+      origin: "Mozambique \u2014 Beira",
       originCountry: "Mozambique",
       destination: "Gopalpur",
       destinationState: "Odisha",
@@ -3226,7 +2949,7 @@ function recordModelHistoryEntry(data = {}) {
     action: action,
     category: category,
     origin: origin,
-    originCountry: origin.split("—")[0]?.trim() || "International",
+    originCountry: origin.split("\u2014")[0]?.trim() || "International",
     destination: destination,
     destinationState: destination.includes("Vizag") || destination.includes("Gangavaram") ? "Andhra Pradesh" : destination.includes("Haldia") || destination.includes("Sagar") ? "West Bengal" : "Odisha",
     vesselType: vesselType,
@@ -3327,7 +3050,7 @@ window.reRunModelHistoryEntry = function (id) {
     resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  showToast(`Restored query: ${entry.origin} → ${entry.destination}`);
+  showToast(`Restored query: ${entry.origin} \u2192 ${entry.destination}`);
 };
 
 window.exportModelHistoryCSV = function () {
@@ -3446,11 +3169,11 @@ window.openModelDetailModal = function (id) {
               ${entry.id}
             </span>
             <span class="text-xs text-slate-500 font-medium">
-              ${entry.displayDate} · ${entry.displayTime}
+              ${entry.displayDate} \u00b7 ${entry.displayTime}
             </span>
           </div>
           <h2 class="text-xl font-bold text-slate-900 font-outfit">
-            ${entry.origin} <span class="text-blue-600">→</span> ${entry.destination}
+            ${entry.origin} <span class="text-blue-600">\u2192</span> ${entry.destination}
           </h2>
           <p class="text-xs text-slate-500 mt-0.5">
             Logged by <strong class="text-slate-700">${entry.user}</strong> (${entry.role || 'Chartering Cell'})
@@ -3521,7 +3244,7 @@ window.openModelDetailModal = function (id) {
           </div>
           <div class="flex justify-between py-1 border-b border-slate-100">
             <span class="text-slate-500">Asymmetric Regret Range:</span>
-            <span class="font-semibold text-slate-800">$${entry.regretMin.toFixed(2)} – $${entry.regretMax.toFixed(2)}</span>
+            <span class="font-semibold text-slate-800">$${entry.regretMin.toFixed(2)} \u2013 $${entry.regretMax.toFixed(2)}</span>
           </div>
           <div class="flex justify-between py-1 border-b border-slate-100">
             <span class="text-slate-500">TCE Equivalent:</span>
@@ -3585,7 +3308,7 @@ window.openModelDetailModal = function (id) {
       <!-- Modal Footer Action Buttons -->
       <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
         <div class="text-[11px] text-slate-400">
-          Record ID: <span class="font-mono text-slate-600">${entry.id}</span> · Stored locally
+          Record ID: <span class="font-mono text-slate-600">${entry.id}</span> \u00b7 Stored locally
         </div>
         <div class="flex items-center gap-2 w-full sm:w-auto">
           <button onclick="closeModelDetailModal()" class="flex-1 sm:flex-none text-xs bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium px-4 py-2.5 rounded-xl transition-colors">
@@ -3639,7 +3362,7 @@ function renderModelAnalysisView() {
         <!-- Action Header Buttons -->
         <div class="flex flex-wrap items-center gap-2">
           <button onclick="state.activeTab='dashboard'; renderApp();" class="text-xs bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium px-3 py-2 rounded-lg transition-colors shadow-2xs">
-            ← Back to Route Explorer
+            \u2190 Back to Route Explorer
           </button>
           <button onclick="exportModelHistoryCSV()" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg transition-colors shadow-xs flex items-center gap-1.5">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -3856,7 +3579,7 @@ function renderHistoryItemCard(item) {
             ${item.action}
           </span>
           <span class="text-xs text-slate-500 hidden md:inline">
-            · <strong class="text-slate-700 font-medium">${item.user}</strong>
+            \u00b7 <strong class="text-slate-700 font-medium">${item.user}</strong>
           </span>
         </div>
 
@@ -3928,23 +3651,23 @@ const portConstraintsData = [
 ];
 
 const internationalLoadingPortsData = [
-  { country: "Australia", port_name: "Australia — Newcastle - Kooragang", terminal_operator: "Port Waratah Coal Services (PWCS)", max_loa_m: 300, max_beam_m: 50, max_draft_m: 15.2, handling_rate: "Up to 10,500 tph", handling_rate_num: 10500, max_vessel_class: "Capesize (up to 210,000 DWT)", loading_method: "Fixed berth", notes: "Sailing draft is tide/UKC dependent", source_url: "https://pwcs.com.au" },
-  { country: "Australia", port_name: "Australia — Newcastle - Carrington", terminal_operator: "Port Waratah Coal Services (PWCS)", max_loa_m: 270, max_beam_m: 47, max_draft_m: 12.5, handling_rate: "Up to 2,500 tph per loader", handling_rate_num: 2500, max_vessel_class: "Panamax (up to 180,000 DWT)", loading_method: "Fixed berth", notes: "LOA extendable to 275m with approval", source_url: "https://pwcs.com.au" },
-  { country: "Australia", port_name: "Australia — Newcastle - NCIG", terminal_operator: "Newcastle Coal Infrastructure Group (NCIG)", max_loa_m: 300, max_beam_m: 50, max_draft_m: 13.8, handling_rate: "Up to 10,500 tph", handling_rate_num: 10500, max_vessel_class: "Capesize (min 35,000 DWT)", loading_method: "Fixed berth", notes: "Draft after tide and 10% UKC allowance", source_url: "https://ncig.com.au" },
-  { country: "Australia", port_name: "Australia — Hay Point Coal Terminal", terminal_operator: "North Queensland Bulk Ports (NQBP)", max_loa_m: 300, max_beam_m: 60.9, max_draft_m: 18.6, handling_rate: "4,500-8,400 tph by berth", handling_rate_num: 8400, max_vessel_class: "Capesize (up to 230,000 DWT)", loading_method: "Fixed berth (3 berths)", notes: "Berth pocket depth up to 18.6m", source_url: "https://nqbp.com.au" },
-  { country: "Australia", port_name: "Australia — Dalrymple Bay Coal Terminal", terminal_operator: "DBCT Management", max_loa_m: 320, max_beam_m: 52, max_draft_m: 16.24, handling_rate: "7,200-8,650 tph per loader", handling_rate_num: 8650, max_vessel_class: "Capesize (40,000-220,000 DWT)", loading_method: "Fixed berth (4 berths)", notes: "3 shiploaders system", source_url: "https://dbct.com.au" },
-  { country: "Australia", port_name: "Australia — Abbot Point Coal Terminal", terminal_operator: "North Queensland Bulk Ports (NQBP)", max_loa_m: 300, max_beam_m: 70, max_draft_m: 18.5, handling_rate: "6,000-7,200 tph", handling_rate_num: 7200, max_vessel_class: "Capesize", loading_method: "Fixed berth (2 berths)", notes: "Deepwater offshore berth", source_url: "https://nqbp.com.au" },
-  { country: "Indonesia", port_name: "Indonesia — Taboneo (Banjarmasin anchorage)", terminal_operator: "Various barge operators", max_loa_m: 100, max_beam_m: 40, max_draft_m: 6.4, handling_rate: "600 tph conveyor / 15,000-40,000 t/day", handling_rate_num: 2500, max_vessel_class: "Bulkers via transshipment", loading_method: "Anchorage transshipment", notes: "Ocean vessels loaded via barge/floating crane transshipment", source_url: "https://gem.wiki" },
-  { country: "Mozambique", port_name: "Mozambique — Beira", terminal_operator: "CFM / Cornelder de Mocambique", max_loa_m: 140, max_beam_m: 25, max_draft_m: 7.0, handling_rate: "~6.5 Mt/yr rail feed", handling_rate_num: 1500, max_vessel_class: "Handysize / Offshore transshipment", loading_method: "Fixed pier + offshore transshipment", notes: "Night-navigation limit 140m LOA; channel ~11m", source_url: "https://delagoasl.com" },
-  { country: "United States", port_name: "United States — Norfolk - Lamberts Point Pier 6", terminal_operator: "Norfolk Southern", max_loa_m: 305, max_beam_m: 53, max_draft_m: 15.0, handling_rate: "16,000-20,000 tons/hr", handling_rate_num: 18000, max_vessel_class: "Capesize (>165,000 DWT)", loading_method: "Fixed berth", notes: "High-speed tandem rotary car dumpers", source_url: "https://vamaritime.com" },
-  { country: "United States", port_name: "United States — Newport News - Kinder Morgan Pier IX", terminal_operator: "Kinder Morgan", max_loa_m: 305, max_beam_m: 47, max_draft_m: 15.2, handling_rate: "8,000 tons/hr design", handling_rate_num: 8000, max_vessel_class: "Capesize", loading_method: "Fixed berth", notes: "50ft MLW channel; air draft 19.8m", source_url: "https://vamaritime.com" },
-  { country: "United States", port_name: "United States — Baltimore - CNX Marine Terminal (Curtis Bay)", terminal_operator: "CNX Resources", max_loa_m: 381, max_beam_m: 53, max_draft_m: 14.3, handling_rate: "7,000 short tons/hr", handling_rate_num: 7000, max_vessel_class: "Panamax/Capesize", loading_method: "Fixed berth", notes: "Air draft 16.8m (55ft)", source_url: "https://moranshipping.com" },
-  { country: "Russia", port_name: "Russia — Nakhodka", terminal_operator: "Nakhodka Commercial Sea Port", max_loa_m: 199, max_beam_m: 30, max_draft_m: 11.0, handling_rate: "~12 Mtpa aggregate", handling_rate_num: 2000, max_vessel_class: "Handysize/Handymax (~35,000 DWT)", loading_method: "Fixed berth (multiple terminals)", notes: "Coal handling split across several smaller terminals", source_url: "https://gem.wiki" },
-  { country: "Russia", port_name: "Russia — Vostochny", terminal_operator: "Vostochny Port (VPK)", max_loa_m: 300, max_beam_m: 48, max_draft_m: 16.5, handling_rate: "4 shiploaders x ~3,000 tph", handling_rate_num: 12000, max_vessel_class: "Capesize (~180,000 DWT)", loading_method: "Fixed berth", notes: "Planned increase to 18-19m; fairway depth up to 22m", source_url: "https://portnews.ru" }
+  { country: "Australia", port_name: "Australia \u2014 Newcastle - Kooragang", terminal_operator: "Port Waratah Coal Services (PWCS)", max_loa_m: 300, max_beam_m: 50, max_draft_m: 15.2, handling_rate: "Up to 10,500 tph", handling_rate_num: 10500, max_vessel_class: "Capesize (up to 210,000 DWT)", loading_method: "Fixed berth", notes: "Sailing draft is tide/UKC dependent", source_url: "https://pwcs.com.au" },
+  { country: "Australia", port_name: "Australia \u2014 Newcastle - Carrington", terminal_operator: "Port Waratah Coal Services (PWCS)", max_loa_m: 270, max_beam_m: 47, max_draft_m: 12.5, handling_rate: "Up to 2,500 tph per loader", handling_rate_num: 2500, max_vessel_class: "Panamax (up to 180,000 DWT)", loading_method: "Fixed berth", notes: "LOA extendable to 275m with approval", source_url: "https://pwcs.com.au" },
+  { country: "Australia", port_name: "Australia \u2014 Newcastle - NCIG", terminal_operator: "Newcastle Coal Infrastructure Group (NCIG)", max_loa_m: 300, max_beam_m: 50, max_draft_m: 13.8, handling_rate: "Up to 10,500 tph", handling_rate_num: 10500, max_vessel_class: "Capesize (min 35,000 DWT)", loading_method: "Fixed berth", notes: "Draft after tide and 10% UKC allowance", source_url: "https://ncig.com.au" },
+  { country: "Australia", port_name: "Australia \u2014 Hay Point Coal Terminal", terminal_operator: "North Queensland Bulk Ports (NQBP)", max_loa_m: 300, max_beam_m: 60.9, max_draft_m: 18.6, handling_rate: "4,500-8,400 tph by berth", handling_rate_num: 8400, max_vessel_class: "Capesize (up to 230,000 DWT)", loading_method: "Fixed berth (3 berths)", notes: "Berth pocket depth up to 18.6m", source_url: "https://nqbp.com.au" },
+  { country: "Australia", port_name: "Australia \u2014 Dalrymple Bay Coal Terminal", terminal_operator: "DBCT Management", max_loa_m: 320, max_beam_m: 52, max_draft_m: 16.24, handling_rate: "7,200-8,650 tph per loader", handling_rate_num: 8650, max_vessel_class: "Capesize (40,000-220,000 DWT)", loading_method: "Fixed berth (4 berths)", notes: "3 shiploaders system", source_url: "https://dbct.com.au" },
+  { country: "Australia", port_name: "Australia \u2014 Abbot Point Coal Terminal", terminal_operator: "North Queensland Bulk Ports (NQBP)", max_loa_m: 300, max_beam_m: 70, max_draft_m: 18.5, handling_rate: "6,000-7,200 tph", handling_rate_num: 7200, max_vessel_class: "Capesize", loading_method: "Fixed berth (2 berths)", notes: "Deepwater offshore berth", source_url: "https://nqbp.com.au" },
+  { country: "Indonesia", port_name: "Indonesia \u2014 Taboneo (Banjarmasin anchorage)", terminal_operator: "Various barge operators", max_loa_m: 100, max_beam_m: 40, max_draft_m: 6.4, handling_rate: "600 tph conveyor / 15,000-40,000 t/day", handling_rate_num: 2500, max_vessel_class: "Bulkers via transshipment", loading_method: "Anchorage transshipment", notes: "Ocean vessels loaded via barge/floating crane transshipment", source_url: "https://gem.wiki" },
+  { country: "Mozambique", port_name: "Mozambique \u2014 Beira", terminal_operator: "CFM / Cornelder de Mocambique", max_loa_m: 140, max_beam_m: 25, max_draft_m: 7.0, handling_rate: "~6.5 Mt/yr rail feed", handling_rate_num: 1500, max_vessel_class: "Handysize / Offshore transshipment", loading_method: "Fixed pier + offshore transshipment", notes: "Night-navigation limit 140m LOA; channel ~11m", source_url: "https://delagoasl.com" },
+  { country: "United States", port_name: "United States \u2014 Norfolk - Lamberts Point Pier 6", terminal_operator: "Norfolk Southern", max_loa_m: 305, max_beam_m: 53, max_draft_m: 15.0, handling_rate: "16,000-20,000 tons/hr", handling_rate_num: 18000, max_vessel_class: "Capesize (>165,000 DWT)", loading_method: "Fixed berth", notes: "High-speed tandem rotary car dumpers", source_url: "https://vamaritime.com" },
+  { country: "United States", port_name: "United States \u2014 Newport News - Kinder Morgan Pier IX", terminal_operator: "Kinder Morgan", max_loa_m: 305, max_beam_m: 47, max_draft_m: 15.2, handling_rate: "8,000 tons/hr design", handling_rate_num: 8000, max_vessel_class: "Capesize", loading_method: "Fixed berth", notes: "50ft MLW channel; air draft 19.8m", source_url: "https://vamaritime.com" },
+  { country: "United States", port_name: "United States \u2014 Baltimore - CNX Marine Terminal (Curtis Bay)", terminal_operator: "CNX Resources", max_loa_m: 381, max_beam_m: 53, max_draft_m: 14.3, handling_rate: "7,000 short tons/hr", handling_rate_num: 7000, max_vessel_class: "Panamax/Capesize", loading_method: "Fixed berth", notes: "Air draft 16.8m (55ft)", source_url: "https://moranshipping.com" },
+  { country: "Russia", port_name: "Russia \u2014 Nakhodka", terminal_operator: "Nakhodka Commercial Sea Port", max_loa_m: 199, max_beam_m: 30, max_draft_m: 11.0, handling_rate: "~12 Mtpa aggregate", handling_rate_num: 2000, max_vessel_class: "Handysize/Handymax (~35,000 DWT)", loading_method: "Fixed berth (multiple terminals)", notes: "Coal handling split across several smaller terminals", source_url: "https://gem.wiki" },
+  { country: "Russia", port_name: "Russia \u2014 Vostochny", terminal_operator: "Vostochny Port (VPK)", max_loa_m: 300, max_beam_m: 48, max_draft_m: 16.5, handling_rate: "4 shiploaders x ~3,000 tph", handling_rate_num: 12000, max_vessel_class: "Capesize (~180,000 DWT)", loading_method: "Fixed berth", notes: "Planned increase to 18-19m; fairway depth up to 22m", source_url: "https://portnews.ru" }
 ];
 
 let selectedInfraOrigin = "paradip";
-let selectedInfraDest = "Australia — Newcastle - Kooragang";
+let selectedInfraDest = "Australia \u2014 Newcastle - Kooragang";
 let selectedInfraVessel = "Capesize";
 let selectedInfraDatasetTab = "indian";
 let infraSearchQuery = "";
@@ -3967,7 +3690,7 @@ function getIntlPortObj(query) {
   const found = internationalLoadingPortsData.find(p => 
     p.port_name.toLowerCase() === q ||
     p.port_name.toLowerCase().includes(q) ||
-    q.includes(p.port_name.toLowerCase().replace("australia — ", "").replace("indonesia — ", "").replace("mozambique — ", "").replace("russia — ", "").replace("united states — ", ""))
+    q.includes(p.port_name.toLowerCase().replace("australia \u2014 ", "").replace("indonesia \u2014 ", "").replace("mozambique \u2014 ", "").replace("russia \u2014 ", "").replace("united states \u2014 ", ""))
   );
   return found || internationalLoadingPortsData[0];
 }
@@ -3981,22 +3704,6 @@ function renderInfraConstraintsView() {
 
   const minDraft = Math.min(p1.max_draft_m, p2.max_draft_m);
   const minLoa = Math.min(p1.max_loa_m, p2.max_loa_m);
-  const draftBottleneckPort = p1.max_draft_m < p2.max_draft_m ? p1.port_name : p2.port_name;
-  const loaBottleneckPort = p1.max_loa_m < p2.max_loa_m ? p1.port_name : p2.port_name;
-
-  let feasibilityStatus = "FULL CAPESIZE READY";
-  let feasibilityBadgeClass = "bg-emerald-100 text-emerald-800 border-emerald-300";
-  let feasibilityMessage = `Both ports feature sufficient LOA (≥290m) and deepwater draft (≥14.5m) to accommodate large Capesize bulkers without lightering.`;
-
-  if (minDraft < 10.0 || minLoa < 210) {
-    feasibilityStatus = "HIGH INFRASTRUCTURE CONSTRAINT";
-    feasibilityBadgeClass = "bg-rose-100 text-rose-800 border-rose-300";
-    feasibilityMessage = `Governing draft of ${minDraft}m at ${draftBottleneckPort} prevents direct berthing of Capesize/Panamax bulkers. Mandatory lightering at Sagar/Sandheads or offshore transshipment required.`;
-  } else if (minDraft < 15.0 || minLoa < 290) {
-    feasibilityStatus = "PANAMAX / SUPRAMAX COMPATIBLE";
-    feasibilityBadgeClass = "bg-amber-100 text-amber-800 border-amber-300";
-    feasibilityMessage = `Route is suitable for Panamax (75k DWT) and Supramax (55k DWT) bulk carriers. Capesize operations are restricted due to ${draftBottleneckPort} draft limit (${minDraft}m).`;
-  }
 
   const filteredIndian = portConstraintsData.filter(p => 
     !infraSearchQuery || 
@@ -4029,7 +3736,7 @@ function renderInfraConstraintsView() {
           </p>
         </div>
         <button onclick="state.activeTab='dashboard'; renderApp();" class="text-xs bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium px-3 py-2 rounded-lg transition-colors shadow-sm self-start md:self-auto">
-          ← Back to Route Query
+          \u2190 Back to Route Query
         </button>
       </div>
 
@@ -4045,7 +3752,7 @@ function renderInfraConstraintsView() {
             <select id="infraOriginSelect" onchange="selectedInfraOrigin=this.value; state.query.origin=this.options[this.selectedIndex].text; renderInfraConstraintsView();" class="bg-white text-sm font-bold text-slate-800 w-full p-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 cursor-pointer">
               ${portConstraintsData.map(p => `
                 <option value="${p.port_id}" ${p.port_id === p1.port_id ? 'selected' : ''}>
-                  ${p.port_name} (${p.state}) — Draft: ${p.max_draft_m}m | LOA: ${p.max_loa_m}m
+                  ${p.port_name} (${p.state})
                 </option>
               `).join('')}
             </select>
@@ -4067,56 +3774,12 @@ function renderInfraConstraintsView() {
             <select id="infraDestSelect" onchange="selectedInfraDest=this.value; state.query.destination=this.value; renderInfraConstraintsView();" class="bg-white text-sm font-bold text-slate-800 w-full p-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 cursor-pointer">
               ${internationalLoadingPortsData.map(p => `
                 <option value="${p.port_name}" ${p.port_name === p2.port_name ? 'selected' : ''}>
-                  ${p.port_name} — Draft: ${p.max_draft_m}m | LOA: ${p.max_loa_m}m
+                  ${p.port_name}
                 </option>
               `).join('')}
             </select>
           </div>
 
-        </div>
-      </div>
-
-      <!-- ROUTE FEASIBILITY & CONSTRAINTS SUMMARY BANNER -->
-      <div class="card-elevation bg-gradient-to-r from-slate-900 via-sky-950 to-slate-900 text-white p-6 rounded-2xl mb-8 shadow-xl relative overflow-hidden">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-800">
-          <div>
-            <div class="text-xs text-cyan-300 font-semibold uppercase tracking-wider mb-1">
-              Corridor Constraint Assessment
-            </div>
-            <div class="text-xl font-bold font-outfit text-white flex items-center gap-2">
-              <span>${p1.port_name}</span>
-              <span class="text-slate-400">↔</span>
-              <span>${p2.port_name}</span>
-            </div>
-          </div>
-
-          <!-- Status Badge -->
-          <div class="px-3.5 py-1.5 rounded-xl border font-extrabold text-xs tracking-wide shadow-sm ${feasibilityBadgeClass}">
-            ${feasibilityStatus}
-          </div>
-        </div>
-
-        <p class="text-sm text-slate-300 leading-relaxed mb-4">
-          ${feasibilityMessage}
-        </p>
-
-        <!-- Quick Parameter Highlights Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div class="bg-white/5 border border-white/10 p-3.5 rounded-xl backdrop-blur-xs flex items-center justify-between">
-            <div>
-              <span class="text-slate-400 block text-[10px] uppercase font-semibold">Governing Draft Limit</span>
-              <span class="text-xs text-slate-300 font-medium">Restricted by ${draftBottleneckPort}</span>
-            </div>
-            <span class="text-2xl font-extrabold text-cyan-300 font-outfit">${minDraft}m</span>
-          </div>
-
-          <div class="bg-white/5 border border-white/10 p-3.5 rounded-xl backdrop-blur-xs flex items-center justify-between">
-            <div>
-              <span class="text-slate-400 block text-[10px] uppercase font-semibold">Governing LOA Limit</span>
-              <span class="text-xs text-slate-300 font-medium">Restricted by ${loaBottleneckPort}</span>
-            </div>
-            <span class="text-2xl font-extrabold text-emerald-300 font-outfit">${minLoa}m</span>
-          </div>
         </div>
       </div>
 

@@ -13,8 +13,8 @@ of this report at `GET /api/model-report` and the data-coverage panel at
 
 | Model | Target | Validation | Result |
 |---|---|---|---|
-| Model 2, freight rate | log rate at t+2 weeks | walk-forward refit weekly, 8 unseen weeks, 88 rows | XGBoost, **+17.5% to +19.8% regret vs persistence** (range over 4 seeds), CI excludes zero |
-| Model 1, congestion | **port's estimate** of port stay | 3 held-out dates, 79 voyages, voyage-disjoint | **A per-port median wins. No fitted model beat it.** All R² negative |
+| Model 2, freight rate | log rate at t+2 weeks | walk-forward refit weekly, 8 unseen weeks, 88 rows | XGBoost, **+18.0% to +19.3% regret vs persistence** (range over 4 seeds), CI excludes zero |
+| Model 1, congestion | **port's estimate** of port stay | 3 held-out dates, 347 voyages, voyage-disjoint | **A per-port median wins. No fitted model beat it.** All R² negative |
 
 Two results are negative and are reported as such:
 
@@ -121,8 +121,12 @@ weeks, 88 rows.
 |---|---|---|---|---|
 | Persistence (no change) | 0.2758 | 3.34 | 5.07 | n/a |
 | Per-lane ARIMA(0,1,1) | 0.2465 | 3.07 | 4.74 | 80% |
-| Ridge | 0.2511 | 4.50 | 6.90 | 83% |
-| **XGBoost (deployed)** | **0.2245** | **3.13** | **4.70** | **86%** |
+| Ridge | 0.2439 | 4.00 | 5.72 | 79% |
+| **XGBoost (deployed)** | **0.2226** | **3.09** | **4.65** | **89%** |
+
+Direction accuracy is measured only on moves the training period treated as material;
+persistence predicts exactly zero change, so scoring it on direction is meaningless and it
+reports `null`.
 
 ### The ablation, and what it does and does not show
 
@@ -148,11 +152,11 @@ On 8 out-of-sample weeks, *which* features produce the result is not established
 ### Headline, quoted as a range
 
 Paired bootstrap over the 8 out-of-sample weeks: regret improvement of XGBoost over
-persistence **+0.0716, 95% CI [+0.0173, +0.1453]**. The interval excludes zero, so this
+persistence **+0.0696, 95% CI [+0.0193, +0.1335]**. The interval excludes zero, so this
 difference is real.
 
-Across four seeds XGBoost's regret ranges 0.2213–0.2276, giving a reduction of
-**+17.5% to +19.8%**. Quote the range, not the point. The ranking (XGBoost ahead of
+Across four seeds XGBoost's reduction over persistence ranges 0.180–0.193, i.e.
+**+18.0% to +19.3%**. Quote the range, not the point. The ranking (XGBoost ahead of
 ARIMA, Ridge and persistence) is stable across seeds and environments; the margin is
 modest.
 
@@ -163,8 +167,8 @@ Split by whether the realised move exceeded the training-period 75th percentile:
 
 | Regime | Rows | Regret | MAE \$/MT |
 |---|---|---|---|
-| High volatility | 36 | 0.444 | 5.64 |
-| Normal | 52 | 0.071 | 1.51 |
+| High volatility | 36 | 0.452 | 5.63 |
+| Normal | 52 | 0.064 | 1.33 |
 
 The model degrades sharply in the high-volatility regime. The headline number describes
 the calmer half of the sample. This is the check the earlier single-split run could not

@@ -1,5 +1,5 @@
 {
-  "audited_at": "2026-09-30T19:42:32+05:30",
+  "audited_at": "2026-10-01T02:34:55+05:30",
   "purpose": "Detect datasets that are present, look authoritative, and are not grounded in an identifiable observation.",
   "declared_provenance": {
     "route_rates_weekly": {
@@ -40,7 +40,7 @@
     },
     "bdi_subindices": {
       "tier": "unavailable",
-      "loaded": false
+      "loaded": true
     }
   },
   "route_rates": {
@@ -194,7 +194,7 @@
     },
     "port_weather": {
       "available": true,
-      "rows": 2765,
+      "rows": 4345,
       "verification": "downloaded from the publisher's API; content is the publisher's, not generated here",
       "source_url": "https://archive-api.open-meteo.com/v1/archive",
       "period": [

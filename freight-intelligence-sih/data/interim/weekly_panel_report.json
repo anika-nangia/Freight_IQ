@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-09-30T14:06:27+00:00",
+  "built_at": "2026-09-30T19:14:43+00:00",
   "rows_raw": 286,
   "rows_usable": 220,
   "lanes": 11,
@@ -12,7 +12,7 @@
   "should_have_waited_rate": 0.25,
   "feature_groups_present": {
     "commodity": true,
-    "baltic": false,
+    "baltic": true,
     "weather": true
   },
   "features": [
@@ -33,17 +33,33 @@
     "coal_saf_level",
     "iron_ore_level",
     "crude_oil_level",
-    "wind_max_kt",
-    "log_precip",
-    "rainy_days",
+    "bdi_ret_1w",
+    "bdi_ret_4w",
+    "bdi_vol_4w",
+    "wx_now_wind_max_kt",
+    "wx_now_gust_max_kt",
+    "wx_now_precip_mm",
+    "wx_now_pressure_msl",
+    "wx_now_rainy_days",
+    "log_wx_now_precip",
+    "wx_org_wind_max_kt",
+    "wx_org_gust_max_kt",
+    "wx_org_precip_mm",
+    "wx_org_pressure_msl",
+    "wx_org_gale_days",
+    "wx_org_rainy_days",
+    "log_wx_org_precip",
     "target_ret"
   ],
   "features_dropped_for_coverage": {
-    "ret_8w": 0.692
+    "ret_8w": 0.692,
+    "wx_now_wave_height_m": 0.0,
+    "wx_org_wave_height_m": 0.0
   },
   "features_dropped_as_constant": [
-    "gale_days",
-    "cyclone_days"
+    "wx_now_gale_days",
+    "wx_now_cyclone_days",
+    "wx_org_cyclone_days"
   ],
   "per_lane": [
     {

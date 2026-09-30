@@ -242,7 +242,12 @@ def test_model2_ablation_uses_a_noise_floor_not_a_sign_test():
     m = json.loads(FREIGHT_METRICS.read_text(encoding="utf-8"))
     groups = m["feature_group_ablation"]["groups"]
     tested = {g: r for g, r in groups.items() if r.get("available")}
-    assert tested, "no feature group was testable"
+    excluded = {g: r for g, r in groups.items() if r.get("excluded")}
+    # Every group can legitimately end up measured-excluded, but each exclusion must
+    # state the measurement that justified it rather than being silent.
+    assert tested or excluded, "no feature group was tested or explained"
+    for g, r in excluded.items():
+        assert r.get("reason"), f"{g} is excluded without a stated reason"
     for g, r in tested.items():
         assert "verdict" in r, f"{g} has no human-readable verdict"
         assert r["helps"] in (True, False, None), \
@@ -254,6 +259,58 @@ def test_model2_ablation_uses_a_noise_floor_not_a_sign_test():
             if b["significant_at_95"]:
                 assert r["helps"] == (b["ci95_low"] > 0), \
                     f"{g}: verdict and interval disagree"
+
+
+def test_ablation_sign_convention_is_correct():
+    """`helps` must mean what it says.
+
+    The bootstrap diffs are reference_regret - reduced_regret, so a NEGATIVE interval
+    means removing the group made things worse, i.e. the group helps. An earlier
+    version read that as "hurts" and reported momentum as harmful, which would have
+    dropped a group that genuinely carries the model.
+    """
+    m = json.loads(FREIGHT_METRICS.read_text(encoding="utf-8"))
+    groups = m["feature_group_ablation"]["groups"]
+    for name, r in groups.items():
+        if not r.get("available"):
+            continue
+        b = r.get("bootstrap", {})
+        if not b.get("available") or not b.get("significant_at_95"):
+            continue
+        lo, hi = b["ci95_low"], b["ci95_high"]
+        if lo > 0:
+            assert r["helps"] is False, (
+                f"{name}: interval entirely positive means removing the group IMPROVED "
+                f"regret, so the group hurts, yet helps={r['helps']}")
+        elif hi < 0:
+            assert r["helps"] is True, (
+                f"{name}: interval entirely negative means removing the group WORSENED "
+                f"regret, so the group helps, yet helps={r['helps']}")
+
+
+def test_perfect_foresight_weather_can_never_be_deployed():
+    """wx_tgt_* is the weather at the target week. Nobody knows it at decision time."""
+    m = json.loads(FREIGHT_METRICS.read_text(encoding="utf-8"))
+    deployed = [f for f in m["features"] if f.startswith("wx_tgt")]
+    assert not deployed, (
+        f"perfect-foresight weather features are in the deployed model: {deployed}. "
+        f"These describe the outcome window and are not knowable at prediction time.")
+    from models.model_2_freight.train_freight import DIAGNOSTIC_GROUPS
+    for cols in DIAGNOSTIC_GROUPS.values():
+        for c in cols:
+            assert c not in m["features"], f"diagnostic feature {c} leaked into deployment"
+
+
+def test_weather_diagnostic_reports_every_preregistered_variant():
+    m = json.loads(FREIGHT_METRICS.read_text(encoding="utf-8"))
+    d = m.get("weather_diagnostic", {})
+    assert d.get("pre_registered") is True
+    got = set(d.get("variants", {}))
+    for expected in ("A_no_weather", "B_nowcast_discharge", "C_nowcast_origin",
+                     "D_nowcast_both", "E_target_perfect_foresight_UPPER_BOUND"):
+        assert expected in got, f"pre-registered variant {expected} missing from the report"
+    if "conclusion" in d:
+        assert d["conclusion"], "a conclusion was reached without being written down"
 
 
 def test_model2_deployed_features_match_the_artifact():
