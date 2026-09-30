@@ -266,19 +266,13 @@
               <!-- Search Form Bar + Button -->
               <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-stretch">
                 
-                <!-- Column 1: From Indian East Coast Ports, India -->
+                <!-- Column 1: From. Fixed value, not a choice: every corridor the models
+                     can price loads into an Indian east coast port, so there is nothing
+                     to pick here. app.js falls back to this same string when
+                     #originSelect is absent. -->
                 <div class="md:col-span-4 bg-white text-slate-900 p-3 rounded-xl flex flex-col justify-center shadow-xs">
                   <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">From</label>
-                  <select id="originSelect" class="auth-guarded-input bg-transparent text-sm font-bold text-slate-800 w-full focus:outline-none cursor-pointer">
-                    <option value="Indian East Coast Ports, India" selected>Indian East Coast Ports, India (All Gateways)</option>
-                    <option value="Visakhapatnam (Vizag)">Visakhapatnam (Vizag), Andhra Pradesh</option>
-                    <option value="Gangavaram Port">Gangavaram Port, Andhra Pradesh</option>
-                    <option value="Paradip Port">Paradip Port, Odisha</option>
-                    <option value="Dhamra Port">Dhamra Port, Odisha</option>
-                    <option value="Gopalpur Port">Gopalpur Port, Odisha</option>
-                    <option value="Haldia Dock Complex">Haldia Dock Complex, West Bengal</option>
-                    <option value="Sagar & Sandheads">Sagar & Sandheads, West Bengal</option>
-                  </select>
+                  <div class="text-sm font-bold text-slate-800">Indian East Coast Ports, India (All Gateways)</div>
                 </div>
 
                 <!-- Column 2: To Destination Port -->

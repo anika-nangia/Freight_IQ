@@ -34,6 +34,12 @@ SIGNAL_THRESHOLD = 0.5
 DEFAULT_DEMURAGE_USD_PER_DAY = 18500.0
 
 
+def _signed(v: float) -> str:
+    """'up $3.14 a tonne' reads better than a bare signed figure on a card."""
+    direction = "up" if v > 0 else ("down" if v < 0 else "flat")
+    return f"{direction} ${abs(v):.2f} a tonne"
+
+
 class MarketTimingService:
     def evaluate(self, forecast: Dict[str, Any],
                  demurrage_usd_per_day: float = DEFAULT_DEMURAGE_USD_PER_DAY) -> Dict[str, Any]:
@@ -65,12 +71,12 @@ class MarketTimingService:
             badge = "amber"
             headline = (f"Forecast move of {move:+.2f} USD/MT is inside the 80% band "
                         f"({lo:.2f} to {hi:.2f}). Not a tradable signal.")
+            # Short on purpose. This text is read on a card, not studied.
             rationale = [
-                f"The model moves the rate {move:+.2f} USD/MT over {horizon_days} days, "
-                f"which is {strength:.0%} of the interval half-width.",
-                "Thresholds below " + f"{SIGNAL_THRESHOLD:.0%} of the band are treated as no signal.",
-                "A confident call here would be a false precision, because the interval "
-                "is wide relative to the predicted move.",
+                f"Rate moves {_signed(move)} over {horizon_days} days, but that is only "
+                f"{strength:.0%} of what our error bars allow.",
+                f"Anything under {SIGNAL_THRESHOLD:.0%} of the range counts as no signal, "
+                f"so there is nothing to act on yet.",
             ]
             cost_of_waiting = None
         elif move > 0:
@@ -79,13 +85,11 @@ class MarketTimingService:
             headline = (f"Model points {move:+.2f} USD/MT higher over {horizon_days} days, "
                         f"which is {strength:.0%} of the interval width. Fix before it lands.")
             rationale = [
-                f"Observed rate {spot:.2f} USD/MT as of {as_of}; forecast {point:.2f} "
-                f"(80% band {lo:.2f} to {hi:.2f}).",
-                "Under-forecasting is penalised 2.5x in the training objective, so the "
-                "upper side of the band is the one to protect.",
-                f"Waiting {horizon_days} days costs roughly "
-                f"{demurrage_usd_per_day * horizon_days:,.0f} USD in demurrage exposure at "
-                f"{demurrage_usd_per_day:,.0f} USD/day.",
+                f"Rate goes {_signed(move)} to {point:.2f} in {horizon_days} days, and that "
+                f"move is {strength:.0%} of the range our error bars allow - enough to act on.",
+                f"Waiting costs about "
+                f"{demurrage_usd_per_day * horizon_days:,.0f} USD in demurrage "
+                f"({demurrage_usd_per_day:,.0f} USD/day).",
             ]
             cost_of_waiting = demurrage_usd_per_day * horizon_days
         else:
@@ -94,11 +98,10 @@ class MarketTimingService:
             headline = (f"Model points {move:+.2f} USD/MT lower over {horizon_days} days, "
                         f"which is {strength:.0%} of the interval width. Spot is the better buy.")
             rationale = [
-                f"Observed rate {spot:.2f} USD/MT as of {as_of}; forecast {point:.2f} "
-                f"(80% band {lo:.2f} to {hi:.2f}).",
-                "Falling rates make a fixed commitment expensive and a spot booking flexible.",
-                "This is a directional read on a 20-week history, so a single voyage is "
-                "the appropriate exposure.",
+                f"Rate drops to {point:.2f} in {horizon_days} days, and that move is "
+                f"{strength:.0%} of the range our error bars allow - enough to act on.",
+                "Falling rates make fixing expensive and staying on spot flexible, so book "
+                "one voyage at a time.",
             ]
             cost_of_waiting = 0.0
 

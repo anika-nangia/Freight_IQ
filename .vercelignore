@@ -1,0 +1,28 @@
+# Only the static frontend and the serverless API are deployed to Vercel.
+#
+# The trained models, datasets and pipeline are NOT needed at runtime: the API
+# functions read api_data.json, which was generated from them by
+# tools/build_api_snapshot.py. Keeping them out of the upload makes the deploy
+# fast and the project small. They stay in the repository for local development
+# and for regenerating the snapshot.
+
+freight-intelligence-sih/
+tools/
+tests/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Local tooling
+_harness.js
+_dbg.js
+_*.py
+*.log
+.DS_Store
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db

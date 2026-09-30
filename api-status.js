@@ -28,12 +28,14 @@
 (function () {
   "use strict";
 
-  // Browsers block fetch() from file:// for cross-origin reasons, and a hard-coded
-  // port would break the moment someone runs the API on another one. So: try the
-  // port the page was served from first, then the documented dev default.
+  // Try, in order: an explicit override, the origin the page was served from
+  // (http AND https - a public deploy is https and still has to reach its own
+  // API), then the local development ports.
   function candidateBases() {
     var list = [];
-    if (window.location && window.location.protocol === "http:") {
+    var configured = window.FREIGHTIQ_API_BASE;
+    if (configured) list.push(String(configured).replace(/\/+$/, ""));
+    if (window.location && String(window.location.protocol).indexOf("http") === 0) {
       list.push(window.location.origin);
     }
     list.push("http://127.0.0.1:8000");
@@ -306,6 +308,53 @@
       .trim();
   }
 
+  // The services name their own internals when an input is missing ("congestion
+  // (Model 1) for this port"). A reader of the card does not know what Model 1 is,
+  // so the labels are swapped for the plain thing that was missing.
+  function plainMissing(items) {
+    var subs = [
+      [/congestion\s*\(Model\s*1\)/i, "the berth line-up"],
+      [/freight forecast\s*\(Model\s*2\)/i, "a rate forecast"],
+      [/weather\s*\(no observation[^)]*\)/i, "a weather reading"],
+      [/\bModel\s*\d+\b/g, "that input"]
+    ];
+    var out = [];
+    (items || []).forEach(function (s) {
+      var t = String(s);
+      subs.forEach(function (p) { t = t.replace(p[0], p[1]); });
+      t = t.replace(/\s+for this (port|corridor)\b.*$/i, "");
+      t = t.replace(/^no observation for this port$/i, "a weather reading");
+      t = t.trim();
+      if (t && out.indexOf(t) === -1) out.push(t);
+    });
+    return out.join("; ");
+  }
+
+  // "no physical limits on file for origin 'Nikolaev' or destination 'Paradip/Haldia'"
+  // is a database complaint, not an explanation. Turn it into a sentence.
+  function plainReason(reason) {
+    var s = String(reason || "not enough data to work this out");
+    var m = /no physical limits on file for origin '([^']+)' or destination '([^']+)'/i.exec(s);
+    if (m) {
+      return "We have no berth limits on file for " + m[1] + " or " + m[2] +
+             ", so we cannot say whether a ship of this size fits.";
+    }
+    m = /no physical limits on file for origin ([^,]+?) or destination ([^.]+)\.?$/i.exec(s);
+    if (m) {
+      return "We have no berth limits on file for " + m[1].trim() + " or " + m[2].trim() +
+             ", so we cannot say whether a ship of this size fits.";
+    }
+    return s.replace(/'([^']+)'/g, "$1");
+  }
+
+  // The services return their reasons as a list of sentences, some of which repeat
+  // what the rows underneath already say. Keep the first sentence only: the card is
+  // for a decision, and the rows carry the detail.
+  function firstReason(list) {
+    if (!Array.isArray(list) || !list.length) return "";
+    return String(list[0]).trim();
+  }
+
   function esc(s) {
     return String(s === null || s === undefined ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -550,7 +599,7 @@
       var tb = document.getElementById("marketEntryBadge");
       if (mt.available) {
         if (tb) { tb.textContent = mt.action; tb.className = "text-[11px] font-bold px-2 py-0.5 rounded " + toneFor(mt.action); }
-        setText("marketEntryWhy", (mt.rationale || []).join(" "));
+        setText("marketEntryWhy", firstReason(mt.rationale));
       } else {
         if (tb) { tb.textContent = "No forecast"; tb.className = "text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600"; }
         setText("marketEntryWhy", mt.reason || "no rate history for this corridor");
@@ -566,24 +615,20 @@
                       cc.exposure_at_forecast_usd !== undefined)
             ? (cc.exposure_at_forecast_usd - cc.exposure_at_observed_rate_usd) : null;
           mRows.innerHTML =
-            line("Rate now (" + fc.current_observed_rate_as_of + ")",
+            line("Rate today",
               nfmt(fc.current_observed_rate_usd_mt, " USD/ton"), "text-slate-800") +
-            line("Rate in " + fc.horizon_days + " days",
+            line("In " + fc.horizon_days + " days",
               nfmt(fc.forecast_rate_usd_mt, " USD/ton"), "text-slate-800") +
-            line("Direction",
-              nfmt(fc.trend) +
-              (fc.predicted_change_pct !== null && fc.predicted_change_pct !== undefined
-                ? " (" + (fc.predicted_change_pct > 0 ? "+" : "") + fc.predicted_change_pct + "%)" : ""),
+            line("Trend",
+              (fc.predicted_change_pct === null || fc.predicted_change_pct === undefined)
+                ? nfmt(fc.trend)
+                : (fc.predicted_change_pct > 0 ? "up " : fc.predicted_change_pct < 0 ? "down " : "flat ") +
+                  Math.abs(fc.predicted_change_pct) + "%",
               fc.predicted_change_pct > 0 ? "text-rose-600" : "text-emerald-700") +
-            line("80% band", nfmt(fc.lower_bound_usd_mt) + " to " + nfmt(fc.upper_bound_usd_mt) + " USD/ton", "text-slate-800") +
+            line("Likely range", nfmt(fc.lower_bound_usd_mt) + " to " + nfmt(fc.upper_bound_usd_mt) + " USD/ton", "text-slate-800") +
             (diff === null ? "" :
-              line("Cost of that move on " + nfmt(cc.cargo_volume_mt) + " t",
-                (diff >= 0 ? "+" : "") + usd(diff), "text-slate-800")) +
-            (mt.available && typeof mt.signal_strength_vs_interval === "number" ?
-              line("Move vs its own uncertainty",
-                Math.round(mt.signal_strength_vs_interval * 100) + "% of the band" +
-                (mt.reads_as_signal ? " (reads as signal)" : " (not a signal)"),
-                mt.reads_as_signal ? "text-emerald-700" : "text-amber-700") : "");
+              line("Worth on " + nfmt(cc.cargo_volume_mt) + " t",
+                (diff >= 0 ? "+" : "") + usd(diff), "text-slate-800"));
         } else {
           mRows.innerHTML = '<div class="text-slate-500">' +
             esc(fc.reason || "no observed rate history for this corridor") +
@@ -595,10 +640,9 @@
       var vb = document.getElementById("vesselBadge");
       if (vo.available) {
         if (vb) { vb.textContent = vo.recommended_vessel; vb.className = "text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800"; }
-        setText("vesselWhy", vo.ranking_basis || "ranked by cost per tonne");
-      } else {
+        setText("vesselWhy", vo.ranking_basis || "ranked by cost per tonne");      } else {
         if (vb) { vb.textContent = "Unavailable"; vb.className = "text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600"; }
-        setText("vesselWhy", vo.reason || "vessel data missing");
+        setText("vesselWhy", plainReason(vo.reason));
       }
 
       var vRows = document.getElementById("vesselRows");
@@ -607,29 +651,28 @@
           var md = vo.margin_detail || {};
           var lim = vo.effective_limits || {};
           vRows.innerHTML =
-            line("Ranked on",
+            line("Expected return",
               vo.expected_margin_usd_per_voyage !== null && vo.expected_margin_usd_per_voyage !== undefined
-                ? "expected margin " + usd(vo.expected_margin_usd_per_voyage) + "/voyage"
-                : "cost per tonne (no forecast to price against)", "text-slate-800") +
-            line("Margin per tonne", nfmt(vo.expected_margin_usd_per_tonne, " USD"), "text-emerald-700") +
+                ? usd(vo.expected_margin_usd_per_voyage) + " a voyage"
+                : "not worked out (no forecast to price against)", "text-emerald-700") +
+            line("Profit per tonne", nfmt(vo.expected_margin_usd_per_tonne, " USD"), "text-slate-800") +
             line("Cost per tonne", nfmt(vo.cost_per_ton_usd, " USD"), "text-slate-800") +
             (md.waiting_days_priced !== null && md.waiting_days_priced !== undefined ?
-              line("Waiting priced in", md.waiting_days_priced + " days (" + (md.waiting_source || "model") + ")", "text-slate-800") : "") +
-            line("Destination berth limits",
-              // lim.destination is an object of published limits, not a name.
-              nfmt(lim.destination && lim.destination.port) +
-              (vo.destination_limits_verified ? " (on file)" : " (NOT on file)"),
-              vo.destination_limits_verified ? "text-emerald-700" : "text-rose-600") +
-            line("Origin berth limits",
-              nfmt(lim.origin && lim.origin.port) +
-              (vo.origin_limits_verified ? " (on file)" : " (NOT on file)"),
-              vo.origin_limits_verified ? "text-emerald-700" : "text-rose-600") +
+              line("Waiting counted at", md.waiting_days_priced + " days", "text-slate-800") : "") +
+            line("Discharge port",
+              vo.destination_limits_verified
+                ? nfmt(lim.destination && lim.destination.port) : "no limits on file",
+              vo.destination_limits_verified ? "text-slate-800" : "text-rose-600") +
+            line("Loading port",
+              vo.origin_limits_verified
+                ? nfmt(lim.origin && lim.origin.port) : "no limits on file",
+              vo.origin_limits_verified ? "text-slate-800" : "text-rose-600") +
             (vo.origin_warning ? '<div class="pt-1.5 text-[10px] text-rose-700 leading-relaxed">' +
               esc(vo.origin_warning) + "</div>" : "") +
             (vo.data_quality_warning ? '<div class="pt-1 text-[10px] text-amber-700 leading-relaxed">' +
               esc(vo.data_quality_warning) + "</div>" : "");
         } else {
-          vRows.innerHTML = '<div class="text-slate-500">' + esc(vo.reason || "not computable") + "</div>";
+          vRows.innerHTML = '<div class="text-slate-500">' + esc(plainReason(vo.reason)) + "</div>";
         }
       }
 
@@ -637,7 +680,7 @@
       var rb = document.getElementById("riskBadge");
       if (rm.available) {
         if (rb) { rb.textContent = rm.action; rb.className = "text-[11px] font-bold px-2 py-0.5 rounded " + toneFor(rm.action); }
-        setText("riskWhy", (rm.why || []).join(" "));
+        setText("riskWhy", firstReason(rm.why));
       } else {
         if (rb) { rb.textContent = "Unavailable"; rb.className = "text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600"; }
         setText("riskWhy", rm.reason || "risk inputs missing");
@@ -650,26 +693,23 @@
           var t = (cg && cg.turnaround_estimate) || {};
           var missing = rm.missing_inputs || [];
           rRows.innerHTML =
-            line("Berth state",
+            line("Port congestion",
               inp.congestion_score === null || inp.congestion_score === undefined
-                ? "n/a (Model 1 has no line-up for this port)"
-                : inp.congestion_category + " (" + inp.congestion_score + ")",
+                ? "no reading for this port"
+                : inp.congestion_category,
               inp.congestion_score === null || inp.congestion_score === undefined ? "text-slate-500" : "text-slate-800") +
-            line("Vessels waiting", nfmt(inp.queue_waiting_vessels), "text-slate-800") +
-            line("Port stay, 80% band", range(t.p80_range_days, " days"), "text-slate-800") +
-            line("Rate signal",
-              nfmt(inp.rate_direction) +
-              (inp.rate_signal_strength !== null && inp.rate_signal_strength !== undefined
-                ? " (" + inp.rate_signal_strength + ")" : ""), "text-slate-800") +
-            line("Add more vessels here?", rm.avoid_adding_vessels ? "No" : "Yes",
+            line("Ships waiting",
+              (inp.queue_waiting_vessels === null || inp.queue_waiting_vessels === undefined)
+                ? "no reading" : nfmt(inp.queue_waiting_vessels), "text-slate-800") +
+            line("Time in port",
+              range(t.p80_range_days, " days") === "n/a" ? "no reading" : range(t.p80_range_days, " days"),
+              "text-slate-800") +
+            line("Send more ships?", rm.avoid_adding_vessels ? "No" : "Yes",
               rm.avoid_adding_vessels ? "text-rose-600" : "text-emerald-700") +
             (missing.length
-              ? '<div class="pt-1.5 text-[10px] text-amber-700 leading-relaxed">Decided without: ' +
-                esc(missing.join("; ")) + ".</div>"
-              : "") +
-            '<div class="pt-1.5 text-[10px] text-slate-500 leading-relaxed">' +
-            esc(rm.model_coverage || "") +
-            (rm.threshold_basis ? " " + esc(rm.threshold_basis) : "") + "</div>";
+              ? '<div class="pt-1.5 text-[10px] text-amber-700 leading-relaxed">Worked without: ' +
+                esc(plainMissing(missing)) + ".</div>"
+              : "");
         } else {
           rRows.innerHTML = '<div class="text-slate-500">' + esc(rm.reason || "risk inputs missing") + "</div>";
         }
