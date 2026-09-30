@@ -691,7 +691,6 @@ function initEventListeners() {
   });
 
   // Form input change handlers
-  document.getElementById("originSelect")?.addEventListener("change", handleFormChange);
   document.getElementById("destSelect")?.addEventListener("change", handleFormChange);
 
   // Check Infrastructure Constraints Button (Directs to Infrastructure Constraints comparison screen)
@@ -2997,11 +2996,9 @@ window.reRunModelHistoryEntry = function (id) {
   state.query.destination = entry.destination;
   state.query.vesselType = entry.vesselType;
 
-  const originSel = document.getElementById("originSelect");
   const destSel = document.getElementById("destSelect");
   const vesselSel = document.getElementById("vesselTypeSelect");
 
-  if (originSel) originSel.value = entry.origin;
   if (destSel) destSel.value = entry.destination;
   if (vesselSel) vesselSel.value = entry.vesselType;
 
