@@ -1366,8 +1366,6 @@ function renderRecommendationsView() {
   const container = document.getElementById("dynamicViewContainer");
   if (!container) return;
 
-  const m = getCalculatedMetrics();
-
   container.innerHTML = `
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
       <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1399,9 +1397,6 @@ function renderRecommendationsView() {
             </h3>
             <p id="recoNarrative" class="text-[12px] sm:text-xs text-slate-600 mt-1.5 leading-relaxed max-w-2xl">
               &nbsp;
-            </p>
-            <p class="text-xs text-slate-500 mt-1">
-              Your route query: <strong class="text-slate-800">${state.query.origin}</strong> \u2192 <strong class="text-slate-800">${state.query.destination}</strong> (${m.distanceNm.toLocaleString()} NM)
             </p>
 
             <!--
