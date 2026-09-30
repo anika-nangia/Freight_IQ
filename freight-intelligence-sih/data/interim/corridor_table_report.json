@@ -1,0 +1,117 @@
+{
+  "built_at": "2026-09-30T07:13:39+00:00",
+  "rows": 66,
+  "corridors": 6,
+  "vessel_classes": [
+    "Handymax",
+    "Panamax",
+    "Supramax"
+  ],
+  "months": 6,
+  "period": [
+    "2025-10",
+    "2026-03"
+  ],
+  "feature_groups_present": {
+    "lane_momentum": true,
+    "world_bank_commodity": true,
+    "baltic_subindices": false,
+    "port_weather": true
+  },
+  "per_lane": [
+    {
+      "corridor_id": "Nikolaev->Paradip",
+      "vessel_class": "Panamax",
+      "months": 6,
+      "first": "2025-10",
+      "last": "2026-03",
+      "mean_rate": 47.48
+    },
+    {
+      "corridor_id": "Nikolaev->Paradip",
+      "vessel_class": "Supramax",
+      "months": 6,
+      "first": "2025-10",
+      "last": "2026-03",
+      "mean_rate": 56.25
+    },
+    {
+      "corridor_id": "Nikolaev->Paradip/Haldia",
+      "vessel_class": "Panamax",
+      "months": 6,
+      "first": "2025-10",
+      "last": "2026-03",
+      "mean_rate": 49.8
+    },
+    {
+      "corridor_id": "Nikolaev->Paradip/Haldia",
+      "vessel_class": "Supramax",
+      "months": 6,
+      "first": "2025-10",
+      "last": "2026-03",
+      "mean_rate": 58.29
+    },
+    {
+      "corridor_id": "Richards Bay->Paradip",
+      "vessel_class": "Supramax",
+      "months": 6,
+      "first": "2025-10",
+      "last": "2026-03",
+      "mean_rate": 15.68
+    },
+    {
+      "corridor_id": "Vanino->Paradip",
+      "vessel_class": "Supramax",
+      "months": 6,
+      "first": "2025-10",
+      "last": "2026-03",
+      "mean_rate": 22.07
+    },
+    {
+      "corridor_id": "Xingang->Paradip",
+      "vessel_class": "Handymax",
+      "months": 6,
+      "first": "2025-10",
+      "last": "2026-03",
+      "mean_rate": 26.78
+    },
+    {
+      "corridor_id": "Xingang->Paradip",
+      "vessel_class": "Panamax",
+      "months": 6,
+      "first": "2025-10",
+      "last": "2026-03",
+      "mean_rate": 16.12
+    },
+    {
+      "corridor_id": "Xingang->Paradip",
+      "vessel_class": "Supramax",
+      "months": 6,
+      "first": "2025-10",
+      "last": "2026-03",
+      "mean_rate": 18.22
+    },
+    {
+      "corridor_id": "Xingang->Paradip/Haldia",
+      "vessel_class": "Panamax",
+      "months": 6,
+      "first": "2025-10",
+      "last": "2026-03",
+      "mean_rate": 18.02
+    },
+    {
+      "corridor_id": "Xingang->Paradip/Haldia",
+      "vessel_class": "Supramax",
+      "months": 6,
+      "first": "2025-10",
+      "last": "2026-03",
+      "mean_rate": 19.64
+    }
+  ],
+  "target_provenance_tier": "observed",
+  "known_limitations": [
+    "Only 6 monthly points per corridor: a 1-6 month-ahead monthly model cannot be validated on this depth. Short-horizon (weekly) forecasting carries the statistical weight; monthly output is presented as a conditional path, not a fitted monthly model.",
+    "Corridors are port-pair level, not terminal level. No per-terminal rate differences are invented.",
+    "Rate provenance is unconfirmed; see data_pipeline/provenance.py."
+  ]
+}

@@ -1,0 +1,24 @@
+# Runtime dependencies for the FreightIQ backend and data pipeline.
+#
+# Pinned loosely: the pipeline was developed against Python 3.14 with the versions
+# below. Nothing here is required at API request time except fastapi/uvicorn/pydantic,
+# because models are loaded from disk rather than retrained per request.
+
+# --- API
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+
+# --- Data
+numpy>=1.26
+pandas>=2.1
+openpyxl>=3.1          # reads the World Bank Pink Sheet workbook
+
+# --- Models
+scikit-learn>=1.4      # Ridge, gradient boosting, random forest, standardisation
+xgboost>=2.0           # Model 2 deployed learner
+statsmodels>=0.14      # per-lane ARIMA baseline
+
+# --- Tests
+pytest>=8.0
+httpx>=0.27            # FastAPI TestClient transport

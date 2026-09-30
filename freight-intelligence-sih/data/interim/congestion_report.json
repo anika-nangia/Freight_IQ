@@ -1,0 +1,149 @@
+{
+  "built_at": "2026-09-30T07:13:39+00:00",
+  "training_rows": 1608,
+  "rows_before_filter": 1608,
+  "ports": 13,
+  "snapshot_dates": [
+    "2026-08-10",
+    "2026-08-11",
+    "2026-08-12",
+    "2026-08-13",
+    "2026-08-17",
+    "2026-08-18",
+    "2026-08-21",
+    "2026-08-24",
+    "2026-08-25",
+    "2026-08-26",
+    "2026-08-27",
+    "2026-08-31"
+  ],
+  "features": [
+    "queue_waiting",
+    "vessels_awaiting_berth",
+    "vessels_working",
+    "berths_total",
+    "berth_occupancy",
+    "queue_ratio",
+    "vessels_expected",
+    "arrivals_next_7d",
+    "working_import",
+    "working_export",
+    "cargo_tonnage",
+    "weather_wind_max_kt",
+    "weather_precip_mm",
+    "weather_gale_days"
+  ],
+  "target": "turnaround_days = ETCD - arrival, observed per vessel",
+  "target_stats": {
+    "count": 1608.0,
+    "mean": 4.779,
+    "std": 4.682,
+    "min": 0.0,
+    "25%": 2.0,
+    "50%": 4.0,
+    "75%": 6.0,
+    "max": 95.0
+  },
+  "weather_available": true,
+  "per_port": [
+    {
+      "port": "CHENNAI",
+      "snapshots": 12,
+      "mean_queue": 0.83,
+      "max_queue": 3,
+      "mean_occupancy": 0.08
+    },
+    {
+      "port": "DHAMRA",
+      "snapshots": 12,
+      "mean_queue": 5.5,
+      "max_queue": 8,
+      "mean_occupancy": 0.42
+    },
+    {
+      "port": "ENNORE",
+      "snapshots": 12,
+      "mean_queue": 3.83,
+      "max_queue": 7,
+      "mean_occupancy": 0.53
+    },
+    {
+      "port": "GANGAVARAM",
+      "snapshots": 12,
+      "mean_queue": 0.42,
+      "max_queue": 1,
+      "mean_occupancy": 0.28
+    },
+    {
+      "port": "GOPALPUR",
+      "snapshots": 12,
+      "mean_queue": 0.33,
+      "max_queue": 1,
+      "mean_occupancy": 0.33
+    },
+    {
+      "port": "HALDIA",
+      "snapshots": 12,
+      "mean_queue": 3.0,
+      "max_queue": 5,
+      "mean_occupancy": 0.31
+    },
+    {
+      "port": "KAKINADA",
+      "snapshots": 12,
+      "mean_queue": 5.5,
+      "max_queue": 9,
+      "mean_occupancy": NaN
+    },
+    {
+      "port": "KARAIKAL",
+      "snapshots": 12,
+      "mean_queue": 0.0,
+      "max_queue": 0,
+      "mean_occupancy": 0.27
+    },
+    {
+      "port": "KATTUPALLI",
+      "snapshots": 10,
+      "mean_queue": 0.0,
+      "max_queue": 0,
+      "mean_occupancy": 0.5
+    },
+    {
+      "port": "KRISHNAPATNAM",
+      "snapshots": 12,
+      "mean_queue": 2.17,
+      "max_queue": 6,
+      "mean_occupancy": 0.71
+    },
+    {
+      "port": "PARADIP",
+      "snapshots": 12,
+      "mean_queue": 0.0,
+      "max_queue": 0,
+      "mean_occupancy": NaN
+    },
+    {
+      "port": "SAGAR",
+      "snapshots": 12,
+      "mean_queue": 0.17,
+      "max_queue": 2,
+      "mean_occupancy": NaN
+    },
+    {
+      "port": "VISAKHAPATNAM",
+      "snapshots": 12,
+      "mean_queue": 8.92,
+      "max_queue": 12,
+      "mean_occupancy": 0.47
+    }
+  ],
+  "provenance_tier": "observed",
+  "ports_with_turnaround_observations": 11,
+  "known_limitations": [
+    "Snapshots cover August 2026 only: 12 trading days, 14 ports. A walk-forward test on this is a handful of folds and should be read as a sanity check, not a performance claim.",
+    "A vessel's turnaround is only known once it has discharged, so the newest snapshots are under-represented among completed voyages. The chronological split accounts for this by testing only on the latest dates.",
+    "berths_total is inferred from distinct berth names seen in the line-up, because berth_operations.csv contains only 'Vacant' rows and therefore cannot supply a capacity denominator. Ports whose report omits berth names (Paradip among them) have no occupancy figure, so it is imputed and the score leans on queue length instead.",
+    "'Waiting & Expected' is split into 'arrived and waiting' and 'not yet arrived'. Some ports list every vessel under that single status, so counting it verbatim produced a queue of 40 against zero berthed vessels at Paradip. Only vessels with an arrival date on or before the snapshot are counted as queued."
+  ]
+}

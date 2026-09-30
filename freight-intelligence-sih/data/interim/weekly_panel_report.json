@@ -1,0 +1,142 @@
+{
+  "built_at": "2026-09-30T07:13:39+00:00",
+  "rows_raw": 286,
+  "rows_usable": 220,
+  "lanes": 11,
+  "weeks": 20,
+  "period": [
+    "2025-10-31",
+    "2026-03-13"
+  ],
+  "horizon_weeks": 2,
+  "should_have_waited_rate": 0.25,
+  "feature_groups_present": {
+    "commodity": true,
+    "baltic": false,
+    "weather": true
+  },
+  "features": [
+    "ret_1w",
+    "ret_2w",
+    "ret_4w",
+    "roll_cv_8w",
+    "dev_from_mean_4w",
+    "log_rate",
+    "log_rate_vs_class",
+    "load_port_code",
+    "vessel_class_code",
+    "coal_aus_ret_4w",
+    "coal_saf_ret_4w",
+    "iron_ore_ret_4w",
+    "crude_oil_ret_4w",
+    "coal_aus_level",
+    "coal_saf_level",
+    "iron_ore_level",
+    "crude_oil_level",
+    "wind_max_kt",
+    "log_precip",
+    "rainy_days",
+    "target_ret"
+  ],
+  "features_dropped_for_coverage": {
+    "ret_8w": 0.692
+  },
+  "features_dropped_as_constant": [
+    "gale_days",
+    "cyclone_days"
+  ],
+  "per_lane": [
+    {
+      "corridor_id": "Nikolaev->Paradip",
+      "vessel_class": "Panamax",
+      "weeks": 20,
+      "first": "2025-10-31",
+      "last": "2026-03-13",
+      "mean_rate": 45.8
+    },
+    {
+      "corridor_id": "Nikolaev->Paradip",
+      "vessel_class": "Supramax",
+      "weeks": 20,
+      "first": "2025-10-31",
+      "last": "2026-03-13",
+      "mean_rate": 54.51
+    },
+    {
+      "corridor_id": "Nikolaev->Paradip/Haldia",
+      "vessel_class": "Panamax",
+      "weeks": 20,
+      "first": "2025-10-31",
+      "last": "2026-03-13",
+      "mean_rate": 48.06
+    },
+    {
+      "corridor_id": "Nikolaev->Paradip/Haldia",
+      "vessel_class": "Supramax",
+      "weeks": 20,
+      "first": "2025-10-31",
+      "last": "2026-03-13",
+      "mean_rate": 56.49
+    },
+    {
+      "corridor_id": "Richards Bay->Paradip",
+      "vessel_class": "Supramax",
+      "weeks": 20,
+      "first": "2025-10-31",
+      "last": "2026-03-13",
+      "mean_rate": 14.37
+    },
+    {
+      "corridor_id": "Vanino->Paradip",
+      "vessel_class": "Supramax",
+      "weeks": 20,
+      "first": "2025-10-31",
+      "last": "2026-03-13",
+      "mean_rate": 18.84
+    },
+    {
+      "corridor_id": "Xingang->Paradip",
+      "vessel_class": "Handymax",
+      "weeks": 20,
+      "first": "2025-10-31",
+      "last": "2026-03-13",
+      "mean_rate": 25.16
+    },
+    {
+      "corridor_id": "Xingang->Paradip",
+      "vessel_class": "Panamax",
+      "weeks": 20,
+      "first": "2025-10-31",
+      "last": "2026-03-13",
+      "mean_rate": 15.09
+    },
+    {
+      "corridor_id": "Xingang->Paradip",
+      "vessel_class": "Supramax",
+      "weeks": 20,
+      "first": "2025-10-31",
+      "last": "2026-03-13",
+      "mean_rate": 16.97
+    },
+    {
+      "corridor_id": "Xingang->Paradip/Haldia",
+      "vessel_class": "Panamax",
+      "weeks": 20,
+      "first": "2025-10-31",
+      "last": "2026-03-13",
+      "mean_rate": 16.93
+    },
+    {
+      "corridor_id": "Xingang->Paradip/Haldia",
+      "vessel_class": "Supramax",
+      "weeks": 20,
+      "first": "2025-10-31",
+      "last": "2026-03-13",
+      "mean_rate": 18.33
+    }
+  ],
+  "provenance_tier": "observed",
+  "excluded_features": {
+    "month_sin, month_cos": "Only ~26 weeks of history, so they act as a time index rather than seasonality and the model memorised them."
+  }
+}
